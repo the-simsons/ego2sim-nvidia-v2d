@@ -17,6 +17,7 @@ MANO model files are included (MANO's licence forbids redistribution). Paths ass
 | `tools/` | Pipeline stages and diagnostics (stereo depth, hands, VO, tracking checks, mesh building and scoring, reference cleaning, media) |
 | `agentstar_harness/` | Our additions to the AgentSTAR "Ego2Sim shape-only" mesh harness (a Claude agent modelling each object in Blender from the video) |
 | `policy_s0/` | Per-episode S0 policy training, evaluation and submission packing (FlashSAC in FlashCHORD); snapshot of the final submission code (see below) |
+| `policy_gm/` | Experimental decoupled grasp (G) + movement (M) policies built on the S0 code: shared behaviour-cloned grasp policy, per-episode movement policy (see `policy_gm/README.md`) |
 
 ## Installation
 
