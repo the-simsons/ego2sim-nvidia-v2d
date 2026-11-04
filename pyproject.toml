@@ -1,0 +1,42 @@
+[project]
+name = "ego2sim-nvidia-v2d"
+version = "0.1.0"
+description = "Ego2Sim pipeline for the NVIDIA Video2Data Challenge Track 3"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy>=2.4.6",
+    "scipy>=1.17.1,<2",
+    "opencv-python>=5.0.0.93",
+    "pyarrow>=26.0.1",
+    "pandas>=3.1.1",
+    "matplotlib>=3.11.2",
+    "trimesh>=5.2.0",
+    "usd-core>=26.11",
+    "wandb>=0.31.0",
+    "torch==2.14.1",
+    "manotorch @ git+https://github.com/lixiny/manotorch",
+    "chumpy @ git+https://github.com/mattloper/chumpy",
+    "pymeshlab>=2025.7.post1",
+    "fast-simplification>=0.2.0",
+    "manifold3d>=3.5.4",
+    "pyrender>=0.1.45",
+    "imageio>=2.38.1",
+    "scikit-image>=0.26.0",
+    "pillow>=13.0.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+# chumpy's setup.py imports pip without declaring it
+[tool.uv.extra-build-dependencies]
+chumpy = ["pip"]

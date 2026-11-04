@@ -18,6 +18,86 @@ MANO model files are included (MANO's licence forbids redistribution). Paths ass
 | `agentstar_harness/` | Our additions to the AgentSTAR "Ego2Sim shape-only" mesh harness (a Claude agent modelling each object in Blender from the video) |
 | `policy_s0/` | Per-episode S0 policy training, evaluation and submission packing (FlashSAC in FlashCHORD); snapshot of the final submission code (see below) |
 
+## Installation
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Create the virtual environment and install all dependencies (from the repo root):
+
+```bash
+uv sync
+```
+
+Activate the environment:
+
+```bash
+source .venv/bin/activate
+```
+
+Alternatively, you can run files without activating the environment with:
+
+```sh
+uv run python tools/ego_vo.py ...
+```
+
+### Using `uv`
+
+- `.python-version` pins the Python version (3.11). uv downloads that interpreter if it isn't already installed.
+- Dependencies:
+   - Add a dependency with `uv add <package>` (e.g. `uv add open3d`) 
+   - Remove a dependency with `uv remove <package>` 
+   - Both commands update `pyproject.toml`, `uv.lock` and `.venv` together
+   - Dependencies are listed in `pyproject.toml`
+   - `torch` (2.14.1) is pulled from the PyTorch cu126 index, configured under `[tool.uv.sources]`; the CUDA 12.6
+     build needs an NVIDIA driver for CUDA 12.6 or newer (`nvidia-smi` shows the supported CUDA version)
+- `uv.lock` records the exact version of every dependency so every machine gets the same environment - commit it when changed
+   - To upgrade a dependency: `uv lock --upgrade-package <package>`, then `uv sync`
+
+### Extra Dependencies
+
+`uv sync` installs the packages used by this repo's own `tools/` and `scripts/`. Some tools run in other
+environments instead (their imports say so): FlashCHORD and Warp for `collision_hulls.py`, `settle_spawn_v2.py`,
+`render_recon_gl.py` and `read_wandb_offline.py` (FlashCHORD's venv); FoundationStereo's code for
+`ego_stereo_depth.py --method fs`; `v2d` (the submodule below) for `ego_hands.py` and `build_ego_bundle.py`;
+`v2dlb` (submission kit) for the CD-O tools. The full pipeline also needs:
+- the [video_to_data](https://github.com/nvidia-isaac/video_to_data) repo at the pinned commit (provides the `v2d`
+  modules imported by a few tools). It is included as a git submodule in `third_party/video_to_data`
+  - Use `git submodule update --init` to fetch (or clone this repo with `--recurse-submodules`)
+  - The scripts expect it at `~/v2d/vtd_pinned`: `ln -s "$PWD/third_party/video_to_data" ~/v2d/vtd_pinned`
+- separate environments for the models (SAM2, MoGe, FoundationPose, WiLoR, ...). Upstream runs each in its own Docker
+  image (see upstream's [reconstruction modules README](https://github.com/nvidia-isaac/video_to_data/blob/8c778f905cb35f76f8e6cd6e2ea486da4fb9e0ef/reconstruction/README.md)
+  and [ego reconstruction setup guide](https://github.com/nvidia-isaac/video_to_data/blob/8c778f905cb35f76f8e6cd6e2ea486da4fb9e0ef/reconstruction/docs/ego_e2e_setup.md)).
+  If you have Docker with the NVIDIA Container Toolkit, you can follow those instead. Otherwise
+  `scripts/setup_recon_envs.sh` rebuilds the images as uv venvs under `~/v2d/envs/<name>/.venv`:
+  ```bash
+  scripts/setup_recon_envs.sh host v2d_moge v2d_sam2 v2d_wilor v2d_hamer v2d_foundation_pose v2d_task_library_loader rg_retarget
+  ```
+  - The script sources `~/v2d/env.sh` (not in this repo; create it, e.g. with your PATH/CUDA exports, or an empty file)
+  - It expects the upstream repo at `~/v2d/vtd_pinned` (see the symlink above)
+  - `v2d_foundation_pose` compiles CUDA extensions and needs the CUDA 12.4 toolkit at `~/v2d/cuda/12.4`
+    (e.g. `micromamba create -p ~/v2d/cuda/12.4 -c nvidia/label/cuda-12.4.1 cuda-toolkit`)
+- the MANO hand model files. These are released by the Max Planck Institute for Intelligent Systems under the
+  [MANO licence](https://mano.is.tue.mpg.de/license.html) (non-commercial scientific research only, no
+  redistribution), so they are not in this repo. To install them:
+  1. Register at [mano.is.tue.mpg.de](https://mano.is.tue.mpg.de/) and accept the licence
+  2. From Downloads, get "Models & Code" (`mano_v1_2.zip`)
+  3. Unpack it so the tools find `~/v2d/mano/models/MANO_RIGHT.pkl` and `MANO_LEFT.pkl`:
+     ```bash
+     mkdir -p ~/v2d/mano && unzip mano_v1_2.zip -d /tmp/mano && cp -r /tmp/mano/mano_v1_2/models ~/v2d/mano/
+     ```
+
+### Submission kit
+
+Scoring against public mocap (`tools/score_public_episode.py`, `tools/local_cd_o.py`) and packing the submission
+(`scripts/pack_eval.sh`) need the challenge submission kit: the official packer, scoring code, eval object list, and
+`v2dlb` for mesh decimation. It is distributed to challenge participants:
+1. Download it from the challenge page and unpack to `~/v2d/submission_kit/v2d_submission_kit`
+2. Create its env at `~/v2d/envs/kit/.venv` (the scripts call that Python) and install the kit's requirements into it
+
 ## Reconstruction (per evaluation episode)
 
 Driver: `scripts/ego2sim_public_episode.sh EP OBJ1[,OBJ2] GPU` with `SPLIT=evaluation TAG=_v2 MESH_SRC=meshes_final
