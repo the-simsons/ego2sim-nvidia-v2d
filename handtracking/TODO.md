@@ -1,6 +1,7 @@
 # TODO: per-frame fallback and follow-ups
 
-Status 31 Oct 2026. The per-frame fallback works on the benchmark (commit 05b40cf) but is not yet in the pipeline stage.
+Status 4 Nov 2026. The per-frame fallback is in the pipeline stage (`handbench/pipeline/hamer_pass.py`,
+`multiview_hands.py`); validated on episode 41 (below). Status 31 Oct: benchmark only (commit 05b40cf).
 
 ## Where we are
 
@@ -22,24 +23,26 @@ E8fallback-e1best-smooth --smooth`, then `run_eval` and `compare`.
 
 ## 1. Fallback in the pipeline stage (`handbench/pipeline/multiview_hands.py`)
 
-- [ ] **HaMeR pass**: run the upstream per-track HaMeR regression (`run_ego_wilor.py` step 14, `--run_hamer_pass`)
+- [x] **HaMeR pass**: run the upstream per-track HaMeR regression (`run_ego_wilor.py` step 14, `--run_hamer_pass`)
       on our SAM2 hand masks, from the teammates' `~/v2d/envs/v2d_hamer` env, importing (not editing) their code.
       Output to `$E/hands/multiview_work/hamer/`; reuse when present.
-- [ ] **Correct the HaMeR hands** like the benchmark fallback: stereo scale (+ keypoint shift where available) in the
+- [x] **Correct the HaMeR hands** like the benchmark fallback: stereo scale (+ keypoint shift where available) in the
       benchmark camera. The benchmark used E1best-sgbm (stereo scale, shared size, dz, smoothing); decide which of those
-      steps the pipeline needs.
-- [ ] **Decide per frame** with `hand_fallback.plausibility` / `is_plausible` / `better` / `choose_fallback`; the stage
+      steps the pipeline needs. Done: keypoint shift where >= 4 joints are triangulated, else per-frame stereo scale;
+      HaMeR hands with neither are not used (its depth is a size-based guess). No shared size / dz step.
+- [x] **Decide per frame** with `hand_fallback.plausibility` / `is_plausible` / `better` / `choose_fallback`; the stage
       already has the cam_a masks and keypoints.
-- [ ] **Splice, then smooth once** (`seam_offsets`, then Savitzky–Golay w7 o2 over the spliced runs), then `fill_gaps`.
-- [ ] Mark swapped frames in the output (`"correction": "fallback"`) and count them in `multiview_hands_info.json`.
-- [ ] Unit test for `choose_fallback` / `seam_offsets` in `handbench/tests`.
+- [x] **Splice, then smooth once** (`seam_offsets`, then Savitzky–Golay w7 o2 over the spliced runs), then `fill_gaps`.
+- [x] Mark swapped frames in the output (`"correction": "fallback"`) and count them in `multiview_hands_info.json`.
+- [x] Unit test for `choose_fallback` / `seam_offsets` in `handbench/tests` (`test_hand_fallback.py`, + HaMeR camera).
 
 Blocked on GPU: both GPUs were full with another user's training jobs (31 Oct, about 3–4 GB free each).
 
 ## 2. Validate
 
-- [ ] Episode 41 through the pipeline command (as `results/pipeline_multiview_check/`): no regression against the
-      current 45.9 mm / +2.6 mm.
+- [x] Episode 41 through the stage on inputs rebuilt from handbench data (`inputs_from_refs`; without the fallback
+      46.3 mm / +2.9 mm, matching the pipeline check's 45.9 / +2.6): with the fallback 46.1 mm / +3.2 mm, held-out cam_b
+      22.5 vs 24.8 px, coverage 98.5 vs 88.8 %, jitter 3.31 vs 2.94 m/s². No regression.
 - [ ] A failure episode (24, 22 or 0) through the pipeline. These have no SAM2 hand prompts in `~/v2d/ego2sim/` yet;
       prompts exist only for episodes 2, 11, 13, 18, 21, 23, 26, 40, 41.
 

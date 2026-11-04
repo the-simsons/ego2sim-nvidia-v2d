@@ -22,8 +22,11 @@ SAM2 hand masks ─► [ego_hands.py | multiview_hands] ─► clean_hand_tracks
                       hands_by_side/{left,right}           (unchanged)        (object-aware fill)      (unchanged)
 ```
 
-Each record also says how it was corrected (`"correction": keypoints | carried | stereo | none | filled`); what the
-steps do is in [BEST_APPROACH.md](BEST_APPROACH.md).
+Each record also says how it was corrected (`"correction": keypoints | carried | stereo | none | fallback | filled`);
+what the steps do is in [BEST_APPROACH.md](BEST_APPROACH.md). `fallback` frames carry a per-frame HaMeR hand: used where
+HaWoR's hand is implausible in cam_a (outside its SAM2 mask or far from the cam_a keypoints, e.g. HaWoR on another
+person's hand) or missing, with HaMeR's depth corrected like HaWoR's (keypoints, else stereo). `--no-hamer-fallback`
+turns it off; it is also off, with a message, when no HaMeR environment is found (see below).
 
 | Inputs (all already produced by the pipeline) | Path |
 |---|---|
@@ -33,7 +36,7 @@ steps do is in [BEST_APPROACH.md](BEST_APPROACH.md).
 | rig calibration | `handtracking/refs/calib/rig.json` (in git; one ego rig for all episodes) |
 | **Outputs** | |
 | hand tracks | `$E/hands/hands_by_side/{left,right}/<frame>.json`, `$E/hands/hands_by_side/multiview_hands_info.json` |
-| intermediate | `$E/hands/multiview_work/` (HaWoR export, keypoints; reused when present) |
+| intermediate | `$E/hands/multiview_work/` (HaWoR export, keypoints, HaMeR records; reused when present) |
 
 Standalone, without the episode script:
 
@@ -43,7 +46,17 @@ cd handtracking
     --stereo-dir $S --hand-masks $E/hand_masks --out $E/hands/hands_by_side --gpu 0
 ```
 
-Cost: about 4 min of GPU (HaWoR) + 3–5 min of CPU (keypoints) per 300-frame episode.
+Cost: about 4 min of GPU (HaWoR) + 2 min of GPU (HaMeR fallback, ~2 GB) + 3–5 min of CPU (keypoints) per 300-frame
+episode.
+
+HaMeR fallback environment: an env that imports video_to_data's `v2d.hamer.lib` (e.g. the pipeline's
+`~/v2d/envs/v2d_hamer`, from `scripts/setup_recon_envs.sh ... v2d_hamer`) and HaMeR weights (a folder with `_DATA/`).
+Found automatically in that order: `--hamer-python` / `--hamer-weights`, `$HAMER_PYTHON` / `$HAMER_WEIGHTS`,
+`~/v2d/envs/v2d_hamer/.venv/bin/python` / `~/v2d/vtd_pinned/reconstruction/data/weights/hamer`, then
+`handtracking/egofound/methods/` (the standalone E0 env, `egofound/tools/setup_e0_env.sh`).
+
+To run and score the stage off the pipeline machine, `python -m handbench.pipeline.inputs_from_refs --episode EP
+--out DIR` rebuilds its inputs (stereo depth, SAM2 hand masks) from handbench data.
 
 ### One-time setup (in `handtracking/`)
 

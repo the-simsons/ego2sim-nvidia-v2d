@@ -6,6 +6,9 @@ hand meshes, and a plain text label in the top-left corner (outlined text, no bo
 --results is the folder holding <method>/<episode>/hands.npz (handbench layout). Hands on frames the method did not
 predict itself (interpolated, e.g. EgoFound3R's in-between frames) are drawn too, in the same colours, so the video
 does not flicker. Left hand orange, right hand red.
+--stage-output DIR instead reads the pipeline hand stage's own output (DIR/{left,right}/<frame>.json, e.g.
+$E/hands/hands_by_side); with it, frames whose "correction" is "fallback" (the per-frame HaMeR hand) are drawn green
+and a small legend says so.
 """
 from __future__ import annotations
 
@@ -38,11 +41,30 @@ def label(img, text):
     return img
 
 
+FALLBACK_COL = (80, 200, 60)  # BGR green
+
+
+def legend(img, active: bool):
+    """Bottom-left legend for the stage output: hand colours, the fallback colour highlighted on fallback frames."""
+    scale = img.shape[1] / 1800
+    th = max(1, int(round(2 * scale)))
+    y = img.shape[0] - int(20 * scale)
+    for k, (txt, col) in enumerate((("left", COL["L"]), ("right", COL["R"]), ("HaMeR fallback", FALLBACK_COL))):
+        x = int(20 * scale) + k * int(230 * scale)
+        cv2.circle(img, (x + int(10 * scale), y - int(8 * scale)), int(9 * scale), col, -1, cv2.LINE_AA)
+        w = th + (2 if k == 2 and active else 0)
+        cv2.putText(img, txt, (x + int(26 * scale), y), cv2.FONT_HERSHEY_DUPLEX, 0.7 * scale, (20, 20, 20), w * 4,
+                    cv2.LINE_AA)
+        cv2.putText(img, txt, (x + int(26 * scale), y), cv2.FONT_HERSHEY_DUPLEX, 0.7 * scale,
+                    FALLBACK_COL if k == 2 and active else (255, 255, 255), w, cv2.LINE_AA)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--episode", required=True)
-    ap.add_argument("--method", required=True)
-    ap.add_argument("--results", required=True, help="folder with <method>/<episode>/hands.npz")
+    ap.add_argument("--method", default="")
+    ap.add_argument("--results", default="", help="folder with <method>/<episode>/hands.npz")
+    ap.add_argument("--stage-output", default="", help="pipeline hand stage output folder ({left,right}/<frame>.json)")
     ap.add_argument("--label", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--width", type=int, default=1280)
@@ -51,8 +73,20 @@ def main():
     ep = paths.ep_name(a.episode)
     A = load_rig(paths.rig_json())["ego_cam_a"]
     mapa = cv2.initUndistortRectifyMap(A.K, A.dist, np.eye(3), A.K, A.size, cv2.CV_32FC1)
-    tr = hf.load(Path(a.results) / a.method / ep / "hands.npz")
     mano = Mano()
+    fallback_rows = set()
+    if a.stage_output:
+        import json
+
+        from handbench.adapters.team_objfill import convert
+        arr, _ = convert(int(ep.split("_")[-1]), mano, root=a.stage_output)
+        tr = hf.HandTracks(arr, {})
+        for s_, side in enumerate(("left", "right")):
+            for f in Path(a.stage_output, side).glob("*.json"):
+                if json.loads(f.read_text()).get("correction") == "fallback":
+                    fallback_rows.add(2 * int(f.stem) + s_)
+    else:
+        tr = hf.load(Path(a.results) / a.method / ep / "hands.npz")
     W = a.width - a.width % 2
     H = int(round(W * A.size[1] / A.size[0]))
     H -= H % 2
@@ -75,8 +109,10 @@ def main():
                                 side == "R", tr["scale"][r])
             V = V[0]
             img = draw_mesh(img, V[:, :2] / V[:, 2:3] * np.diag(A.K)[:2] + A.K[:2, 2], mano.faces_for(side == "R"),
-                            COL[side])
+                            FALLBACK_COL if r in fallback_rows else COL[side])
         img = label(cv2.resize(img, (W, H), interpolation=cv2.INTER_AREA), a.label)
+        if a.stage_output:
+            legend(img, any(2 * i + s_ in fallback_rows for s_ in (0, 1)))
         ff.stdin.write(np.ascontiguousarray(img).tobytes())
     ff.stdin.close()
     ff.wait()
