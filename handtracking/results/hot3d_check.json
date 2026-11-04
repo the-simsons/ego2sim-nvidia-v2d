@@ -1,0 +1,299 @@
+{
+ "summary": {
+  "raw": {
+   "mpjpe": 28.42412278629784,
+   "depth": 20.56243044573477,
+   "lateral": 16.505503961315384,
+   "bias": -17.029830229142576,
+   "pose": 7.4202753041767116,
+   "mpjpe_median": 22.71381329011933,
+   "bias_median": -12.44135841785858,
+   "jitter": 8.173464117799126,
+   "n_hand_frames": 1433
+  },
+  "stereo-scale": {
+   "mpjpe": 117.14450820078088,
+   "depth": 110.64918814741961,
+   "lateral": 19.087520111646377,
+   "bias": 43.026006311525165,
+   "pose": 14.153251098403503,
+   "mpjpe_median": 30.21422356659023,
+   "bias_median": -0.8482236312533806,
+   "jitter": 111.213226406079,
+   "n_hand_frames": 1433
+  },
+  "e1best": {
+   "mpjpe": 128.4956429556877,
+   "depth": 123.10070701973531,
+   "lateral": 22.182928031282028,
+   "bias": 68.24967946700383,
+   "pose": 11.021930057249975,
+   "mpjpe_median": 48.1586551353493,
+   "bias_median": 5.32721123863289,
+   "jitter": 29.947680636748768,
+   "n_hand_frames": 1433
+  },
+  "stereo-global": {
+   "mpjpe": 84.60645116559857,
+   "depth": 79.72347435804541,
+   "lateral": 19.43382346117656,
+   "bias": 44.798502433282344,
+   "pose": 11.031973128211972,
+   "mpjpe_median": 35.46162423566138,
+   "bias_median": -0.6009303512511679,
+   "jitter": 9.568067949872988,
+   "n_hand_frames": 1433
+  },
+  "stereo-global+savgol": {
+   "mpjpe": 84.42350244128119,
+   "depth": 79.48044104210402,
+   "lateral": 19.439424642299482,
+   "bias": 44.792990603162814,
+   "pose": 11.021930057249975,
+   "mpjpe_median": 34.87118506941541,
+   "bias_median": -0.9681167920232799,
+   "jitter": 3.7077704700768064,
+   "n_hand_frames": 1433
+  }
+ },
+ "per_clip_mpjpe": {
+  "clip-001849": {
+   "e1best": 137.1,
+   "raw": 17.7,
+   "stereo-global": 110.7,
+   "stereo-global+savgol": 110.5,
+   "stereo-scale": 87.4
+  },
+  "clip-002065": {
+   "e1best": 80.5,
+   "raw": 21.5,
+   "stereo-global": 32.5,
+   "stereo-global+savgol": 32.0,
+   "stereo-scale": 76.6
+  },
+  "clip-002281": {
+   "e1best": 173.8,
+   "raw": 43.8,
+   "stereo-global": 145.6,
+   "stereo-global+savgol": 145.6,
+   "stereo-scale": 155.3
+  },
+  "clip-002498": {
+   "e1best": 142.9,
+   "raw": 24.3,
+   "stereo-global": 63.0,
+   "stereo-global+savgol": 62.4,
+   "stereo-scale": 142.9
+  },
+  "clip-002714": {
+   "e1best": 166.0,
+   "raw": 37.0,
+   "stereo-global": 52.2,
+   "stereo-global+savgol": 52.2,
+   "stereo-scale": 202.1
+  },
+  "clip-002931": {
+   "e1best": 158.5,
+   "raw": 29.7,
+   "stereo-global": 132.7,
+   "stereo-global+savgol": 132.7,
+   "stereo-scale": 143.1
+  },
+  "clip-003147": {
+   "e1best": 33.8,
+   "raw": 26.7,
+   "stereo-global": 21.5,
+   "stereo-global+savgol": 21.5,
+   "stereo-scale": 35.8
+  }
+ },
+ "per_clip_info": {
+  "clip-001849": {
+   "baseline_m": 0.13889008374824494,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 143,
+    "scored": 141,
+    "coverage": 0.986013986013986,
+    "stereo_ok_frac": 0.5202702702702703,
+    "shared_scale": 1.4457799196243286,
+    "jitter_raw": 8.030420285498607,
+    "jitter_stereo-scale": 104.81886350528296,
+    "jitter_e1best": 32.53300946771207,
+    "jitter_stereo-global": 11.610220394917757,
+    "jitter_stereo-global+savgol": 3.762156495793993
+   },
+   "right": {
+    "visible_gt_frames": 147,
+    "scored": 145,
+    "coverage": 0.9863945578231292,
+    "stereo_ok_frac": 0.6621621621621622,
+    "shared_scale": 1.0013591647148132,
+    "jitter_raw": 8.506930554162397,
+    "jitter_stereo-scale": 59.144313989683056,
+    "jitter_e1best": 16.840503554252972,
+    "jitter_stereo-global": 8.518492874002977,
+    "jitter_stereo-global+savgol": 2.9675508104087465
+   }
+  },
+  "clip-002065": {
+   "baseline_m": 0.13859662878717507,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 150,
+    "scored": 147,
+    "coverage": 0.98,
+    "stereo_ok_frac": 0.54421768707483,
+    "shared_scale": 1.0699935555458069,
+    "jitter_raw": 8.959340730913473,
+    "jitter_stereo-scale": 61.419795839904644,
+    "jitter_e1best": 16.92451763383555,
+    "jitter_stereo-global": 9.586436844016474,
+    "jitter_stereo-global+savgol": 4.41942901823818
+   },
+   "right": {
+    "visible_gt_frames": 0,
+    "scored": 0,
+    "coverage": 0.0,
+    "stereo_ok_frac": 0.5121951219512195,
+    "shared_scale": 2.001979112625122
+   }
+  },
+  "clip-002281": {
+   "baseline_m": 0.13811284950525177,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 150,
+    "scored": 150,
+    "coverage": 1.0,
+    "stereo_ok_frac": 0.6733333333333333,
+    "shared_scale": 1.4747586250305176,
+    "jitter_raw": 7.9515511064747395,
+    "jitter_stereo-scale": 228.86203187073997,
+    "jitter_e1best": 56.3560661025141,
+    "jitter_stereo-global": 11.726618576644578,
+    "jitter_stereo-global+savgol": 3.8164542983927676
+   },
+   "right": {
+    "visible_gt_frames": 102,
+    "scored": 102,
+    "coverage": 1.0,
+    "stereo_ok_frac": 0.788135593220339,
+    "shared_scale": 0.9958738088607788,
+    "jitter_raw": 5.688085013613981,
+    "jitter_stereo-scale": 112.71156352731857,
+    "jitter_e1best": 24.738655259244695,
+    "jitter_stereo-global": 5.664614887631669,
+    "jitter_stereo-global+savgol": 1.764832578132433
+   }
+  },
+  "clip-002498": {
+   "baseline_m": 0.13918710517092056,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 70,
+    "scored": 69,
+    "coverage": 0.9857142857142858,
+    "stereo_ok_frac": 0.9130434782608695,
+    "shared_scale": 1.291070818901062,
+    "jitter_raw": 6.671255076511343,
+    "jitter_stereo-scale": 293.27332334337746,
+    "jitter_e1best": 60.38033657552855,
+    "jitter_stereo-global": 8.613062754729366,
+    "jitter_stereo-global+savgol": 2.5935036994775578
+   },
+   "right": {
+    "visible_gt_frames": 150,
+    "scored": 150,
+    "coverage": 1.0,
+    "stereo_ok_frac": 0.78,
+    "shared_scale": 1.0154633522033691,
+    "jitter_raw": 12.631174314791743,
+    "jitter_stereo-scale": 59.546571194684404,
+    "jitter_e1best": 24.726536789459946,
+    "jitter_stereo-global": 12.826494611963518,
+    "jitter_stereo-global+savgol": 4.5672920474060295
+   }
+  },
+  "clip-002714": {
+   "baseline_m": 0.13797199748668895,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 0,
+    "scored": 0,
+    "coverage": 0.0,
+    "stereo_ok_frac": 1.0,
+    "shared_scale": 0.941922664642334
+   },
+   "right": {
+    "visible_gt_frames": 150,
+    "scored": 147,
+    "coverage": 0.98,
+    "stereo_ok_frac": 0.9727891156462585,
+    "shared_scale": 0.9661626219749451,
+    "jitter_raw": 9.174944605833442,
+    "jitter_stereo-scale": 156.5297239591905,
+    "jitter_e1best": 45.95174238541164,
+    "jitter_stereo-global": 8.864488536846917,
+    "jitter_stereo-global+savgol": 3.252235292753159
+   }
+  },
+  "clip-002931": {
+   "baseline_m": 0.13830544315988874,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 41,
+    "scored": 39,
+    "coverage": 0.9512195121951219,
+    "stereo_ok_frac": 0.39759036144578314,
+    "shared_scale": 1.779020071029663,
+    "jitter_raw": 9.665789916746519,
+    "jitter_stereo-scale": 127.61084871001259,
+    "jitter_e1best": 33.61891236099548,
+    "jitter_stereo-global": 17.195634264248195,
+    "jitter_stereo-global+savgol": 8.218581663646214
+   },
+   "right": {
+    "visible_gt_frames": 127,
+    "scored": 127,
+    "coverage": 1.0,
+    "stereo_ok_frac": 0.9069767441860465,
+    "shared_scale": 0.8462496995925903,
+    "jitter_raw": 8.182756230173975,
+    "jitter_stereo-scale": 64.79008465511895,
+    "jitter_e1best": 25.384033912424922,
+    "jitter_stereo-global": 6.9246550016241235,
+    "jitter_stereo-global+savgol": 2.9723516488132984
+   }
+  },
+  "clip-003147": {
+   "baseline_m": 0.13938902887690777,
+   "n": 150,
+   "left": {
+    "visible_gt_frames": 76,
+    "scored": 76,
+    "coverage": 1.0,
+    "stereo_ok_frac": 0.8383838383838383,
+    "shared_scale": 1.0992110967636108,
+    "jitter_raw": 5.883327658445086,
+    "jitter_stereo-scale": 24.62410559687187,
+    "jitter_e1best": 8.179123504024671,
+    "jitter_stereo-global": 6.467019048059112,
+    "jitter_stereo-global+savgol": 2.6882238144700508
+   },
+   "right": {
+    "visible_gt_frames": 150,
+    "scored": 140,
+    "coverage": 0.9333333333333333,
+    "stereo_ok_frac": 0.7857142857142857,
+    "shared_scale": 1.0123342871665955,
+    "jitter_raw": 6.73599392042421,
+    "jitter_stereo-scale": 41.2274906807628,
+    "jitter_e1best": 13.738730095580616,
+    "jitter_stereo-global": 6.819077603791166,
+    "jitter_stereo-global+savgol": 3.470634273389241
+   }
+  }
+ },
+ "wall_time_s": 42.491663694381714
+}

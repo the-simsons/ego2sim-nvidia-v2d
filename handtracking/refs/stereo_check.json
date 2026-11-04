@@ -1,0 +1,22 @@
+{
+ "sgbm": {
+  "joints_compared": 39632,
+  "joint_coverage": 0.669753608003515,
+  "mask_pixel_coverage": 0.5993513693386782,
+  "median_signed_mm": 0.43520331382751465,
+  "median_abs_mm": 19.030392169952393,
+  "mad_mm": 19.0565288066864,
+  "within_10mm": 0.32761404925312876,
+  "within_20mm": 0.5130197819943481
+ },
+ "fs": {
+  "joints_compared": 44520,
+  "joint_coverage": 0.7523574542873559,
+  "mask_pixel_coverage": 0.7157947811678522,
+  "median_signed_mm": 0.30112266540527344,
+  "median_abs_mm": 22.20037579536438,
+  "mad_mm": 22.222056984901428,
+  "within_10mm": 0.29683288409703507,
+  "within_20mm": 0.4707322551662174
+ }
+}

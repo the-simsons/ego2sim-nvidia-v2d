@@ -1,0 +1,286 @@
+{
+ "episodes": [
+  {
+   "episode": "episode_000018",
+   "n_frames": 353,
+   "keyframes": 24,
+   "masks": {
+    "L": 353,
+    "R": 353
+   },
+   "wall_time_s": 52.03290128707886,
+   "fps": 6.784168923524924,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000000",
+   "n_frames": 373,
+   "keyframes": 27,
+   "masks": {
+    "L": 368,
+    "R": 240
+   },
+   "wall_time_s": 54.913575172424316,
+   "fps": 6.792491516915163,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000043",
+   "n_frames": 326,
+   "keyframes": 22,
+   "masks": {
+    "L": 326,
+    "R": 326
+   },
+   "wall_time_s": 45.06238150596619,
+   "fps": 7.234415617985036,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000002",
+   "n_frames": 343,
+   "keyframes": 26,
+   "masks": {
+    "L": 343,
+    "R": 245
+   },
+   "wall_time_s": 48.320960521698,
+   "fps": 7.098368724869007,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000039",
+   "n_frames": 319,
+   "keyframes": 22,
+   "masks": {
+    "L": 319,
+    "R": 319
+   },
+   "wall_time_s": 44.86219620704651,
+   "fps": 7.110663883516703,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000023",
+   "n_frames": 325,
+   "keyframes": 22,
+   "masks": {
+    "L": 325,
+    "R": 325
+   },
+   "wall_time_s": 46.67692518234253,
+   "fps": 6.962754982042905,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000041",
+   "n_frames": 299,
+   "keyframes": 20,
+   "masks": {
+    "L": 299,
+    "R": 299
+   },
+   "wall_time_s": 39.78090190887451,
+   "fps": 7.51616936943576,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000031",
+   "n_frames": 290,
+   "keyframes": 20,
+   "masks": {
+    "L": 290,
+    "R": 290
+   },
+   "wall_time_s": 41.00801920890808,
+   "fps": 7.07178739305755,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000024",
+   "n_frames": 275,
+   "keyframes": 20,
+   "masks": {
+    "L": 275,
+    "R": 275
+   },
+   "wall_time_s": 41.01825928688049,
+   "fps": 6.7043312705744285,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000045",
+   "n_frames": 290,
+   "keyframes": 20,
+   "masks": {
+    "L": 290,
+    "R": 290
+   },
+   "wall_time_s": 43.80175232887268,
+   "fps": 6.620739614835611,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000042",
+   "n_frames": 257,
+   "keyframes": 18,
+   "masks": {
+    "L": 257,
+    "R": 257
+   },
+   "wall_time_s": 36.60117530822754,
+   "fps": 7.021632351627081,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000040",
+   "n_frames": 260,
+   "keyframes": 18,
+   "masks": {
+    "L": 260,
+    "R": 260
+   },
+   "wall_time_s": 37.133543729782104,
+   "fps": 7.001755480559713,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000044",
+   "n_frames": 249,
+   "keyframes": 17,
+   "masks": {
+    "L": 249,
+    "R": 249
+   },
+   "wall_time_s": 35.3794207572937,
+   "fps": 7.0379895893209214,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000027",
+   "n_frames": 246,
+   "keyframes": 17,
+   "masks": {
+    "L": 246,
+    "R": 246
+   },
+   "wall_time_s": 35.75045990943909,
+   "fps": 6.881030221749763,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000022",
+   "n_frames": 189,
+   "keyframes": 15,
+   "masks": {
+    "L": 189,
+    "R": 162
+   },
+   "wall_time_s": 26.51459789276123,
+   "fps": 7.1281487678949835,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000013",
+   "n_frames": 190,
+   "keyframes": 14,
+   "masks": {
+    "L": 190,
+    "R": 147
+   },
+   "wall_time_s": 27.806641340255737,
+   "fps": 6.832899896714818,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000021",
+   "n_frames": 186,
+   "keyframes": 14,
+   "masks": {
+    "L": 186,
+    "R": 165
+   },
+   "wall_time_s": 27.468752145767212,
+   "fps": 6.771330470294065,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000012",
+   "n_frames": 181,
+   "keyframes": 15,
+   "masks": {
+    "L": 181,
+    "R": 160
+   },
+   "wall_time_s": 28.057987689971924,
+   "fps": 6.450925589242,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000011",
+   "n_frames": 137,
+   "keyframes": 11,
+   "masks": {
+    "L": 137,
+    "R": 116
+   },
+   "wall_time_s": 21.046062469482422,
+   "fps": 6.509531039103815,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  },
+  {
+   "episode": "episode_000026",
+   "n_frames": 158,
+   "keyframes": 11,
+   "masks": {
+    "L": 158,
+    "R": 158
+   },
+   "wall_time_s": 23.51167392730713,
+   "fps": 6.720065907953313,
+   "gpu": "NVIDIA GeForce RTX 4090",
+   "checkpoint": "sam2.1_hiera_large.pt",
+   "every": 15
+  }
+ ],
+ "wall_time_s": 383.89302372932434,
+ "gpus": "0,1"
+}

@@ -12,6 +12,8 @@
 #      TAG: suffix for this variant's tracks (epEP/fp_<obj>TAG), hand gap fill (hands/objfillTAG) and output
 #      (train/epEPTAG), so variants do not overwrite each other. The shared bundles/loaded/processed/ per-object
 #      intermediates and the pinned repo's ego_recon assets (by object name) are still rewritten by each run.
+#      HAND_TRACKER=wilor|multiview (default wilor = tools/ego_hands.py); multiview = HaWoR hands corrected with
+#      triangulated cam_a+cam_c keypoints and stereo (handtracking/README.md, Usage), same output layout.
 # Output: ~/v2d/ego2sim/train/epEP$TAG/{processed/sequence_id=epEP/robot_name=sharpa_wave, reconstructed_stage}
 set -euo pipefail
 EP=${1:?episode}; OBJS=${2:?objects}; GPU=${3:-0}
@@ -54,9 +56,16 @@ excl=$(ls -d $E/masks/* $E/hand_masks/* | tr '\n' ',' | sed 's/,$//')
 lap "camera VO"
 hand_ids=$(ls $E/hand_masks | tr '\n' ',' | sed 's/,$//')
 objm=$(for i in "${!NAMES[@]}"; do echo -n "$E/masks/$i,"; done | sed 's/,$//')
+if [ "${HAND_TRACKER:-wilor}" = multiview ]; then  # same output layout as ego_hands.py (handtracking/README.md, Usage)
+  HT=${HANDTRACKING_DIR:-$(cd "$(dirname "$0")/.." && pwd)/handtracking}
+  [ -d "$E/hands/hands_by_side" ] || (cd "$HT" && .venv-bench/bin/python -m handbench.pipeline.multiview_hands \
+    --video-dir "$DATA/videos/chunk-000" --episode "$EP" --stereo-dir "$S" --hand-masks "$E/hand_masks" \
+    --out "$E/hands/hands_by_side" --gpu "$GPU" 2>&1 | grep -E "^\[multiview\] (left|right|mask track|done)" || true)
+else
 [ -d "$E/hands/hands_by_side" ] || $HOST ~/v2d/tools/ego_hands.py "$S" "$E/hands" --hands "$hand_ids" \
   --hand-masks "$E/hand_masks" --object-masks "$objm" --depth-dir "$E/fused_depth" --gpu "$GPU" 2>&1 \
   | grep -E "votes|WARNING|real \+|^track" || true
+fi
 for side in left right; do
   [ -d "$E/hands/clean/$side" ] || $CV ~/v2d/tools/clean_hand_tracks.py "$E/camera_vo.npz" \
     "$E/hands/hands_by_side/$side" "$E/hands/clean/$side"
@@ -85,7 +94,7 @@ if [ "${F0_K:-5}" -gt 1 ]; then  # static-start frame 0 (the scorer aligns on fr
 fi
 
 fps_dirs=$(for n in "${NAMES[@]}"; do echo -n "$E/fp_$n$TAG=$(mesh_of "$n"),"; done | sed 's/,$//')
-nfr=$(ls "$E/hands/frames" | wc -l)
+nfr=$(ls "$E/hands/frames" 2>/dev/null | wc -l); [ "$nfr" -gt 0 ] || nfr=$(ls "$S/stereo_depth" | wc -l)  # multiview writes no frames/
 for side in left right; do  # long gaps while gripping (WiLoR loses occluded hands): carry the hand with the object
   [ -d "$E/hands/objfill$TAG/$side" ] || ~/v2d/envs/v2d_hamer/.venv/bin/python ~/v2d/tools/fill_hand_gaps_object.py \
     "$E/camera_vo.npz" "$E/hands/clean/$side" "$E/hands/objfill$TAG/$side" --objects "$fps_dirs" --frames "$nfr" 2>&1 \
