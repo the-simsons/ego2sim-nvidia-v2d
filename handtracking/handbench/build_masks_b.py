@@ -1,4 +1,5 @@
-"""cam_b hand masks (set A reference A.1): SAM2.1 (Hiera-L) video segmentation of the cam_b video, prompted from cam_a.
+"""cam_b (or cam_c) hand masks (set A reference A.1): SAM2.1 (Hiera-L) video segmentation of that camera's video,
+prompted from cam_a. --camera c builds the same masks for cam_c (refs/<ep>/masks_c/), for held-out cam_c IoU.
 
 Prompt transfer (+ cam_b's own detector keypoints, see transfer_prompts): at keyframes (every --every frames where the cam_a SAM2 hand mask is visible, plus the first visible
 frame of every run) the cam_a mask pixels are lifted to 3D with SGBM stereo depth (refs/<ep>/stereo.npz) and
@@ -8,7 +9,7 @@ points as negatives. SAM2 then propagates both hands through the whole cam_b vid
 Like the cam_a masks, these include the forearm; the metric clips both to the hand region.
 
 Runs in methods/.venv-sam2. Uses every visible GPU: one worker per GPU, episodes from a shared queue.
-Usage: python -m handbench.build_masks_b [--episodes ...] [--every 15]
+Usage: python -m handbench.build_masks_b [--episodes ...] [--every 15] [--camera b|c]
 """
 from __future__ import annotations
 
@@ -30,8 +31,8 @@ SIDES = ("L", "R")
 OBJ = {"L": 1, "R": 2}
 
 
-def transfer_prompts(ep, every: int):
-    """{frame: {side: (box[4], pos_pts (k,2), neg_pts (m,2))}} in cam_b published pixels."""
+def transfer_prompts(ep, every: int, camera: str = "b"):
+    """{frame: {side: (box[4], pos_pts (k,2), neg_pts (m,2))}} in the target camera's published pixels."""
     from handbench.adapters.v2d_upstream import UpstreamCamera, anycalib_dir
     from handbench.build_refs import side_masks
     from handbench.calib import load_rig
@@ -39,11 +40,12 @@ def transfer_prompts(ep, every: int):
     from handbench.refs_io import hand_track_ids
 
     cams = load_rig(paths.rig_json())
-    A, B = cams["ego_cam_a"], cams["ego_cam_b"]
+    A, B = cams["ego_cam_a"], cams[f"ego_cam_{camera}"]
     U = UpstreamCamera(paths.CACHE / ep, A, anycalib_dir(ep))
     st = StereoCrops(paths.REFS / ep / "stereo.npz")
     tracks = hand_track_ids(ep)
     kp = np.load(paths.REFS / ep / "kp2d.npz")
+    view = [str(v) for v in kp["views"]].index(f"ego_cam_{camera}")
     vis = kp["mask_area_a"] >= 400
     n = vis.shape[0]
     keys = set()
@@ -92,7 +94,7 @@ def transfer_prompts(ep, every: int):
             # cam_b sees more of the hand than cam_a near the cam_a image border (127 vs 108 deg FOV): add cam_b's own
             # confident detector keypoints (wrist, MCPs, fingertips) so the mask covers the whole hand as cam_b sees it
             s_i = SIDES.index(side)
-            kb, sb = kp["kp"][i, s_i, 1], kp["score"][i, s_i, 1]
+            kb, sb = kp["kp"][i, s_i, view], kp["score"][i, s_i, view]
             good = (sb >= 0.5) & np.isfinite(kb[:, 0])
             if good.sum() >= 5:
                 q = kb[good]
@@ -108,15 +110,15 @@ def transfer_prompts(ep, every: int):
     return out, n
 
 
-def run_episode(ep, every, tmp_root: Path):
+def run_episode(ep, every, tmp_root: Path, camera: str = "b"):
     import torch
     from sam2.build_sam import build_sam2_video_predictor
 
     t0 = time.time()
-    prompts, n = transfer_prompts(ep, every)
+    prompts, n = transfer_prompts(ep, every, camera)
     frames = tmp_root / ep
     frames.mkdir(parents=True, exist_ok=True)
-    cap = cv2.VideoCapture(str(paths.video(ep, "ego_cam_b")))
+    cap = cv2.VideoCapture(str(paths.video(ep, f"ego_cam_{camera}")))
     i = 0
     while True:
         ok, im = cap.read()
@@ -125,7 +127,7 @@ def run_episode(ep, every, tmp_root: Path):
         cv2.imwrite(str(frames / f"{i:05d}.jpg"), im, [cv2.IMWRITE_JPEG_QUALITY, 95])
         i += 1
     pred = build_sam2_video_predictor(SAM2_CFG, SAM2_CKPT, device="cuda")
-    out = paths.REFS / ep / "masks_b"
+    out = paths.REFS / ep / f"masks_{camera}"
     if out.exists():
         shutil.rmtree(out)
     for s in SIDES:
@@ -159,12 +161,12 @@ def run_episode(ep, every, tmp_root: Path):
     shutil.rmtree(frames)
     info = {"episode": ep, "n_frames": n, "keyframes": len(prompts), "masks": counts, "wall_time_s": time.time() - t0,
             "fps": n / (time.time() - t0), "gpu": torch.cuda.get_device_name(0), "checkpoint": Path(SAM2_CKPT).name,
-            "every": every}
+            "every": every, "camera": f"ego_cam_{camera}"}
     json.dump(info, open(out / "info.json", "w"), indent=1)
     return info
 
 
-def worker(gpu: int, queue, every, tmp_root, results):
+def worker(gpu: int, queue, every, tmp_root, results, camera="b"):
     os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu)
     while True:
         try:
@@ -172,7 +174,7 @@ def worker(gpu: int, queue, every, tmp_root, results):
         except Exception:
             return
         try:
-            info = run_episode(ep, every, tmp_root)
+            info = run_episode(ep, every, tmp_root, camera)
             print(f"[gpu{gpu}] {ep}: {info['masks']} masks, {info['keyframes']} keyframes, "
                   f"{info['wall_time_s']:.0f}s ({info['fps']:.1f} fps)", flush=True)
             results.append(info)
@@ -180,14 +182,14 @@ def worker(gpu: int, queue, every, tmp_root, results):
             print(f"[gpu{gpu}] {ep}: FAILED {type(e).__name__}: {e}", flush=True)
 
 
-def contact_sheet(eps, per_ep=4, out=None):
+def contact_sheet(eps, per_ep=4, out=None, camera="b"):
     tiles = []
     for ep in eps:
-        md = paths.REFS / ep / "masks_b"
+        md = paths.REFS / ep / f"masks_{camera}"
         frames = sorted({int(p.stem) for s in SIDES for p in (md / s).glob("*.png")})
         if not frames:
             continue
-        cap = cv2.VideoCapture(str(paths.video(ep, "ego_cam_b")))
+        cap = cv2.VideoCapture(str(paths.video(ep, f"ego_cam_{camera}")))
         for fi in np.linspace(0, len(frames) - 1, per_ep).astype(int):
             f = frames[fi]
             cap.set(cv2.CAP_PROP_POS_FRAMES, f)
@@ -207,7 +209,7 @@ def contact_sheet(eps, per_ep=4, out=None):
     rows = [np.hstack(tiles[k:k + per_ep] + [np.zeros_like(tiles[0])] * (per_ep - len(tiles[k:k + per_ep])))
             for k in range(0, len(tiles), per_ep)]
     sheet = np.vstack(rows)
-    out = out or paths.REFS / "masks_b_contact_sheet.jpg"
+    out = out or paths.REFS / f"masks_{camera}_contact_sheet.jpg"
     cv2.imwrite(str(out), sheet, [cv2.IMWRITE_JPEG_QUALITY, 85])
     return out
 
@@ -220,17 +222,18 @@ def main():
     ap.add_argument("--every", type=int, default=15)
     ap.add_argument("--gpus", default="0,1")
     ap.add_argument("--sheet-only", action="store_true")
+    ap.add_argument("--camera", choices=["b", "c"], default="b")
     a = ap.parse_args()
     eps = [paths.ep_name(e) for e in a.episodes.split(",")] if a.episodes else paths.episodes()
     if not a.sheet_only:
-        tmp_root = paths.ROOT / "data" / "tmp_camb"
+        tmp_root = paths.ROOT / "data" / f"tmp_cam{a.camera}"
         ctx = mp.get_context("spawn")
         manager = ctx.Manager()
         q = manager.Queue()
         for e in sorted(eps, key=lambda e: -paths.num_frames(e)):  # longest first
             q.put(e)
         results = manager.list()
-        procs = [ctx.Process(target=worker, args=(int(g), q, a.every, tmp_root, results)) for g in a.gpus.split(",")]
+        procs = [ctx.Process(target=worker, args=(int(g), q, a.every, tmp_root, results, a.camera)) for g in a.gpus.split(",")]
         t0 = time.time()
         for p in procs:
             p.start()
@@ -238,9 +241,9 @@ def main():
             p.join()
         res = list(results)
         json.dump({"episodes": res, "wall_time_s": time.time() - t0, "gpus": a.gpus},
-                  open(paths.REFS / "masks_b_run.json", "w"), indent=1)
+                  open(paths.REFS / f"masks_{a.camera}_run.json", "w"), indent=1)
         print(f"done {len(res)}/{len(eps)} episodes in {time.time() - t0:.0f}s")
-    print("contact sheet:", contact_sheet(eps))
+    print("contact sheet:", contact_sheet(eps, camera=a.camera))
 
 
 if __name__ == "__main__":

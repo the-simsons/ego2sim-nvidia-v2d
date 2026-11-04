@@ -24,7 +24,8 @@ PRIMARY = [("mpjpe_tri_abc", "Tri MPJPE abc (mm)", True, "{:.1f}"),
            ("kp_b", "cam_b kp (px)", True, "{:.2f}"),
            ("pck10_b", "cam_b PCK@10", False, "{:.3f}"),
            ("kp_c", "cam_c kp (px)", True, "{:.2f}"),
-           ("iou_b", "cam_b IoU", False, "{:.3f}")]
+           ("pck10_c", "cam_c PCK@10", False, "{:.3f}"),
+           ("iou_b", "cam_b IoU", False, "{:.3f}"), ("iou_c", "cam_c IoU", False, "{:.3f}")]
 SECONDARY = [("iou_a", "cam_a IoU", False, "{:.3f}"),
              ("kp_a", "cam_a kp (px)", True, "{:.2f}"),
              ("ca_mpjpe_tri_abc", "centred MPJPE (mm)", True, "{:.1f}"),

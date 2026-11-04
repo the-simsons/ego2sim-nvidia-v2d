@@ -23,7 +23,7 @@ from handbench.mano import Mano
 
 FRAME_METRICS = ["mpjpe_tri_abc", "depth_tri_abc", "lateral_tri_abc", "bias_tri_abc", "ca_mpjpe_tri_abc",
                  "mpjpe_tri_ab", "depth_tri_ab", "lateral_tri_ab", "bias_tri_ab",
-                 "kp_b", "pck10_b", "kp_c", "pck10_c", "iou_b", "iou_b_full", "kp_a", "pck10_a", "iou_a", "iou_a_full",
+                 "kp_b", "pck10_b", "kp_c", "pck10_c", "iou_b", "iou_b_full", "iou_c", "iou_c_full", "kp_a", "pck10_a", "iou_a", "iou_a_full",
                  "stereo_abs", "stereo_signed"]
 EPISODE_METRICS = ["jitter_accel_ms2", "wrist_fast_frac", "bone_len_std_mm", "betas_std", "swaps_per_min",
                    "coverage_observed", "coverage_any", "infilled_frac_of_visible", "infilled_frac_of_valid"]

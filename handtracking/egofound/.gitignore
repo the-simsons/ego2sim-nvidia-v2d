@@ -1,0 +1,11 @@
+# third-party code, venvs, data, caches and large outputs (never committed)
+methods/
+data/
+logs/
+weights-vggt/
+results/**/hands.npz
+results/**/*.mp4
+results/**/raw/
+# links to handbench results and per-run eval outputs
+results/track3/*/episode_*
+results/track3/*/per_frame.csv
