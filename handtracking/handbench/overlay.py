@@ -1,5 +1,6 @@
 """Overlay video per episode, side by side across methods (one row per method):
   [cam_a undistorted + mesh] [cam_b + projected mesh + cam_b detector keypoints] [depth vs pseudo-GT / stereo plot]
+--second-view c shows cam_c instead of cam_b (the held-out camera when a method used cam_b, e.g. F2/F3).
 
   python -m handbench.overlay --episode 12 --methods E0,E1b-scale [--out results/overlays/ep12.mp4] [--width 1600]
 
@@ -80,13 +81,18 @@ def main():
     ap.add_argument("--start", type=int, default=0, help="first frame to render")
     ap.add_argument("--end", type=int, default=-1, help="last frame to render (inclusive; -1 = end of episode)")
     ap.add_argument("--labels", default="", help="row labels shown instead of the method names (comma-separated)")
+    ap.add_argument("--infilled-colour", action="store_true",
+                    help="draw infilled (unscored) hands in the side colour too, not grey; for methods whose output "
+                         "rate is below the video's (every other frame infilled would flash)")
     ap.add_argument("--fps", type=float, default=0, help="output frame rate (default: the video's); lower = slow motion")
+    ap.add_argument("--second-view", choices=["b", "c"], default="b", help="camera in the second column")
     a = ap.parse_args()
     ep = paths.ep_name(a.episode)
     methods = a.methods.split(",")
     out = a.out or str(paths.RESULTS / "overlays" / f"{ep}_{'_vs_'.join(methods)}.mp4")
     cams = load_rig(paths.rig_json())
-    A, B = cams["ego_cam_a"], cams["ego_cam_b"]
+    view = f"ego_cam_{a.second_view}"
+    A, B = cams["ego_cam_a"], cams[view]
     mano = Mano()
     n = paths.num_frames(ep)
     trs = {m: hf.load(paths.RESULTS / m / ep / "hands.npz") for m in methods}
@@ -103,7 +109,8 @@ def main():
                            f"{Wt}x{Ht}", "-r", f"{(a.fps or paths.fps()):.4f}", "-i", "-", "-c:v", "libx264", "-preset", "medium",
                            "-crf", str(a.crf), "-pix_fmt", "yuv420p", out], stdin=subprocess.PIPE)
     labels = dict(zip(methods, a.labels.split(","))) if a.labels else {}
-    for i, fr in VideoReader(ep, ("ego_cam_a", "ego_cam_b")):
+    kv = [str(v) for v in kp["views"]].index(view)
+    for i, fr in VideoReader(ep, ("ego_cam_a", view)):
         if i < a.start:
             continue
         if i >= n or (a.end >= 0 and i > a.end):
@@ -112,7 +119,7 @@ def main():
         rows = []
         for m in methods:
             tr = trs[m]
-            ia, ib = ua.copy(), fr["ego_cam_b"].copy()
+            ia, ib = ua.copy(), fr[view].copy()
             for s, side in enumerate("LR"):
                 r = 2 * i + s
                 if not tr["valid"][r]:
@@ -121,10 +128,10 @@ def main():
                                     side == "R", tr["scale"][r])
                 V = V[0]
                 faces = mano.faces_for(side == "R")
-                col = COL[side] if tr["source"][r] == "observed" else (160, 160, 160)
+                col = COL[side] if tr["source"][r] == "observed" or a.infilled_colour else (160, 160, 160)
                 ia = draw_mesh(ia, V[:, :2] / V[:, 2:3] * np.diag(A.K)[:2] + A.K[:2, 2], faces, col)
                 ib = draw_mesh(ib, B.project(V), faces, col)
-                k, sc = kp["kp"][i, s, 1], kp["score"][i, s, 1]
+                k, sc = kp["kp"][i, s, kv], kp["score"][i, s, kv]
                 for (x, y), c in zip(k, sc):
                     if c >= 0.5 and np.isfinite(x):
                         cv2.circle(ib, (int(x), int(y)), 3, (0, 220, 0), -1)
@@ -132,7 +139,7 @@ def main():
             ib = cv2.resize(ib, (wb, ha), interpolation=cv2.INTER_AREA)
             cv2.putText(ia, f"{labels.get(m, m)}  cam_a  f{i}", (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2,
                         cv2.LINE_AA)
-            cv2.putText(ib, "cam_b (held out) + detector kps", (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2,
+            cv2.putText(ib, f"cam_{a.second_view} (held out) + detector kps", (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2,
                         cv2.LINE_AA)
             sr = series[m]
             pp = plot_panel(wp, ha, [(sr["L"], COL["L"], False), (sr["R"], COL["R"], False)], i, n,
@@ -150,7 +157,8 @@ def main():
         print("over 30 MB, re-encoding with higher CRF")
         subprocess.run(["python", "-m", "handbench.overlay", "--episode", a.episode, "--methods", a.methods, "--out", out,
                         "--width", str(a.width), "--crf", str(a.crf + 4), "--start", str(a.start), "--end", str(a.end),
-                        "--labels", a.labels, "--fps", str(a.fps)], cwd=paths.ROOT)
+                        "--labels", a.labels, "--fps", str(a.fps), "--second-view", a.second_view]
+                       + (["--infilled-colour"] if a.infilled_colour else []), cwd=paths.ROOT)
 
 
 if __name__ == "__main__":

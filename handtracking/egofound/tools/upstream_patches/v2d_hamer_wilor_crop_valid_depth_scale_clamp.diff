@@ -1,0 +1,274 @@
+diff --git a/reconstruction/modules/v2d_hamer/lib/align_hands.py b/reconstruction/modules/v2d_hamer/lib/align_hands.py
+index 47239e05..669e875d 100644
+--- a/reconstruction/modules/v2d_hamer/lib/align_hands.py
++++ b/reconstruction/modules/v2d_hamer/lib/align_hands.py
+@@ -160,7 +160,19 @@ def _ray_offset(centroid: np.ndarray, dz: float) -> np.ndarray:
+     return np.array([x / z * z_p - x, y / z * z_p - y, dz], dtype=np.float64)
+ 
+ 
+-def _aggregate_hand_scales(output_dir: str) -> dict[str, dict]:
++def _weighted_median(values: np.ndarray, weights: np.ndarray) -> float:
++    order = np.argsort(values)
++    cum = np.cumsum(weights[order])
++    idx = min(int(np.searchsorted(cum, cum[-1] / 2.0)), len(values) - 1)
++    return float(values[order][idx])
++
++
++def _aggregate_hand_scales(
++    output_dir: str,
++    mode: str = "per_track",
++    scale_min: float | None = None,
++    scale_max: float | None = None,
++) -> dict[str, dict]:
+     """Per-track n_pixels-weighted median of the per-frame ``diagnostics.scale``.
+ 
+     Mirrors ``v2d_hand_alignment/lib/align_world_results.py`` aggregation:
+@@ -179,6 +191,22 @@ def _aggregate_hand_scales(output_dir: str) -> dict[str, dict]:
+         d for d in glob.glob(os.path.join(output_dir, "*"))
+         if os.path.isdir(d)
+     )
++    # mode="shared": both hands belong to one person, so use a single scale
++    # (n_pixels-weighted median over every valid frame of every track).
++    # scale_min/scale_max clamp the result to a physically plausible range;
++    # unclamped per-track scales can run to ~3x when the HaMeR depth is poor.
++    shared_scale: float | None = None
++    if mode == "shared":
++        all_s, all_w = [], []
++        for track_dir in track_dirs:
++            for path in glob.glob(os.path.join(track_dir, "*.json")):
++                with open(path) as f:
++                    d = json.load(f).get("diagnostics", {})
++                sc, n = float(d.get("scale", float("nan"))), int(d.get("n_pixels", 0))
++                if np.isfinite(sc) and n >= 256 and 0.2 < sc < 5.0:
++                    all_s.append(sc); all_w.append(n)
++        shared_scale = (_weighted_median(np.asarray(all_s), np.asarray(all_w, dtype=np.float64))
++                        if all_s else 1.0)
+     for track_dir in track_dirs:
+         oid = os.path.basename(track_dir)
+         files = sorted(glob.glob(os.path.join(track_dir, "*.json")))
+@@ -207,9 +235,17 @@ def _aggregate_hand_scales(output_dir: str) -> dict[str, dict]:
+             idx = int(np.searchsorted(wv_cum, cutoff))
+             idx = min(idx, len(sv_sorted) - 1)
+             hs = float(sv_sorted[idx])
++        raw_hs = hs
++        if shared_scale is not None:
++            hs = shared_scale
++        if scale_min is not None:
++            hs = max(hs, scale_min)
++        if scale_max is not None:
++            hs = min(hs, scale_max)
+ 
+         summary[oid] = {
+             "hand_scale":     hs,
++            "hand_scale_unconstrained": raw_hs,
+             "n_valid_frames": n_valid,
+             "n_total_frames": len(files),
+         }
+@@ -238,6 +274,9 @@ def align_hands(
+     hand_masks_dir: str | None = None,
+     object_masks_dir: str | None = None,
+     mask_min_pixels: int = 256,
++    hand_scale_mode: str = "per_track",
++    hand_scale_min: float | None = None,
++    hand_scale_max: float | None = None,
+ ) -> None:
+     fx, fy, cx, cy, W, H = _load_intrinsics(intrinsics_path)
+     print(f"Real intrinsics: fx={fx:.1f} fy={fy:.1f} cx={cx:.1f} cy={cy:.1f}  {W}×{H}")
+@@ -277,7 +316,7 @@ def align_hands(
+     # corrects multiplicative depth mismatch (the dominant monocular failure
+     # mode). The renderer reads ``rec["hand_scale"]`` (or falls back to 1.0).
+     print("\nAggregating per-track hand_scale...")
+-    summary = _aggregate_hand_scales(output_dir)
++    summary = _aggregate_hand_scales(output_dir, hand_scale_mode, hand_scale_min, hand_scale_max)
+     if summary:
+         scale_path = os.path.join(output_dir, "hand_scale.json")
+         with open(scale_path, "w") as f:
+@@ -368,14 +407,28 @@ def _align_loop(
+ 
+             n_pixels = int(hand_mask.sum())
+ 
++            valid_depth_pixels = 0
+             if depth_image is not None and n_pixels >= mask_min_pixels:
+                 di = depth_image[hand_mask]
+                 dr = rendered_depth[hand_mask]
+-                dz = float(np.median(di - dr))
+-                scale = float(np.median(di / dr))
+-                centroid_pre = mesh.vertices.mean(axis=0) + cam_t_real_pre
+-                offset = _ray_offset(centroid_pre, dz)
+-                cam_t_aligned = cam_t_real_pre + offset
++                # Stereo reprojection leaves holes. Invalid pixels can decode
++                # as 0 m or inf in the inverse-depth PNG format; exclude them
++                # before computing robust offsets and scales.
++                valid = np.isfinite(di) & (di > 0.05) & np.isfinite(dr) & (dr > 0.05)
++                valid_depth_pixels = int(valid.sum())
++                min_valid = max(mask_min_pixels, int(0.10 * n_pixels))
++                if valid_depth_pixels >= min_valid:
++                    di = di[valid]
++                    dr = dr[valid]
++                    dz = float(np.median(di - dr))
++                    scale = float(np.median(di / dr))
++                    centroid_pre = mesh.vertices.mean(axis=0) + cam_t_real_pre
++                    offset = _ray_offset(centroid_pre, dz)
++                    cam_t_aligned = cam_t_real_pre + offset
++                else:
++                    dz = 0.0
++                    scale = 1.0
++                    cam_t_aligned = cam_t_real_pre
+             else:
+                 dz = 0.0
+                 scale = 1.0
+@@ -395,6 +448,7 @@ def _align_loop(
+                 "diagnostics": {
+                     "dz":           dz,
+                     "n_pixels":     n_pixels,
++                    "n_valid_depth_pixels": valid_depth_pixels,
+                     "scale":        scale,
+                     "cam_t_pre_dz": cam_t_real_pre.tolist(),
+                     "scaled_focal": scaled_focal,
+@@ -421,6 +475,13 @@ def main() -> None:
+                              "(per-frame PNGs). Pixels in this mask are "
+                              "excluded from the depth-comparison region.")
+     parser.add_argument("--mask_min_pixels",  type=int, default=256)
++    parser.add_argument("--hand_scale_mode", choices=("per_track", "shared"), default="per_track",
++                        help="'shared' uses one hand scale for both hands (weighted median "
++                             "over all valid frames).")
++    parser.add_argument("--hand_scale_min", type=float, default=None,
++                        help="Lower clamp for the final hand scale.")
++    parser.add_argument("--hand_scale_max", type=float, default=None,
++                        help="Upper clamp for the final hand scale.")
+     args = parser.parse_args()
+     align_hands(
+         hamer_dir        = args.hamer_dir,
+@@ -431,6 +492,9 @@ def main() -> None:
+         hand_masks_dir   = args.hand_masks_dir,
+         object_masks_dir = args.object_masks_dir,
+         mask_min_pixels  = args.mask_min_pixels,
++        hand_scale_mode  = args.hand_scale_mode,
++        hand_scale_min   = args.hand_scale_min,
++        hand_scale_max   = args.hand_scale_max,
+     )
+ 
+ 
+diff --git a/reconstruction/modules/v2d_hamer/lib/masks_to_hands.py b/reconstruction/modules/v2d_hamer/lib/masks_to_hands.py
+index c5b0216b..b18137c3 100644
+--- a/reconstruction/modules/v2d_hamer/lib/masks_to_hands.py
++++ b/reconstruction/modules/v2d_hamer/lib/masks_to_hands.py
+@@ -67,6 +67,42 @@ def _mask_centroid_and_size(mask: np.ndarray) -> tuple[float, float, float, int]
+     return cx, cy, side, int(xs.size)
+ 
+ 
++def _pick_wilor_box(
++    wilor_raw_dir: str, frame_idx: int, mask: np.ndarray, min_mask_frac: float = 0.1,
++) -> tuple[float, float, float] | None:
++    """Return (cx, cy, side) of the WiLoR hand box that best sits inside ``mask``.
++
++    SAM2 hand masks include the forearm, so their centroid/bbox describe the
++    arm rather than the hand. WiLoR's per-frame detections are hand-sized. The
++    two hand masks never overlap, so a detection is assigned to a track by the
++    fraction of its box covered by that track's mask, provided the box centre
++    lies inside the mask. WiLoR boxes are loose (typically only ~30% mask
++    coverage) so the threshold is low; the other hand's mask covers 0% of a
++    given box. WiLoR's own handedness label is not used for localisation.
++    """
++    path = os.path.join(wilor_raw_dir, f"{frame_idx:06d}.json")
++    if not os.path.exists(path):
++        return None
++    with open(path) as f:
++        dets = json.load(f)
++    H, W = mask.shape
++    best, best_frac = None, min_mask_frac
++    for det in dets:
++        b = det["bbox"]
++        x0, y0 = max(int(b["x0"]), 0), max(int(b["y0"]), 0)
++        x1, y1 = min(int(b["x1"]), W), min(int(b["y1"]), H)
++        area = (x1 - x0) * (y1 - y0)
++        if area <= 0:
++            continue
++        frac = float(mask[y0:y1, x0:x1].sum()) / area
++        cy, cx = min((y0 + y1) // 2, H - 1), min((x0 + x1) // 2, W - 1)
++        if frac > best_frac and mask[cy, cx]:
++            best_frac = frac
++            best = ((b["x0"] + b["x1"]) * 0.5, (b["y0"] + b["y1"]) * 0.5,
++                    float(max(b["x1"] - b["x0"], b["y1"] - b["y0"])))
++    return best
++
++
+ def masks_to_hands(
+     frames_dir: str,
+     masks_dir: str,
+@@ -75,7 +111,13 @@ def masks_to_hands(
+     weights_dir: str,
+     bbox_expansion: float = 1.7,
+     mask_min_pixels: int = 256,
++    crop_source: str = "mask",
++    wilor_raw_dir: str | None = None,
+ ) -> None:
++    if crop_source not in ("mask", "wilor"):
++        raise ValueError(f"crop_source must be 'mask' or 'wilor', got {crop_source!r}")
++    if crop_source == "wilor" and wilor_raw_dir is None:
++        raise ValueError("crop_source='wilor' requires wilor_raw_dir")
+     with open(tracks_path) as f:
+         tracks = json.load(f)["tracks"]
+     hand_tracks = [t for t in tracks if t.get("role", "hand") == "hand"]
+@@ -95,7 +137,7 @@ def masks_to_hands(
+         side = "right" if is_right else "left"
+         print(f"\nTrack {oid} ({side}): {len(mask_files)} mask frames")
+ 
+-        n_written = n_skipped = 0
++        n_written = n_skipped = n_wilor = 0
+         for mask_path in tqdm(mask_files, desc=f"  track {oid}", ncols=80, unit="frame"):
+             frame_idx = int(os.path.splitext(os.path.basename(mask_path))[0])
+             frame_path = os.path.join(frames_dir, f"{frame_idx:06d}.png")
+@@ -116,6 +158,13 @@ def masks_to_hands(
+ 
+             image = np.asarray(Image.open(frame_path).convert("RGB"))
+             H, W = image.shape[:2]
++            used_crop = "mask"
++            if crop_source == "wilor":
++                box = _pick_wilor_box(wilor_raw_dir, frame_idx, mask)
++                if box is not None:
++                    cx, cy, mask_side = box
++                    used_crop = "wilor"
++                    n_wilor += 1
+             size = mask_side * bbox_expansion
+             # Clamp center so the crop stays a real bbox (HaMeR's crop helper
+             # handles out-of-image padding internally, but keeping center sane
+@@ -131,6 +180,7 @@ def masks_to_hands(
+                 "is_right":   is_right,
+                 "frame_idx":  frame_idx,
+                 "image_size": [int(W), int(H)],
++                "crop_source": used_crop,
+                 "bbox": {
+                     "x0": float(cx - half),
+                     "y0": float(cy - half),
+@@ -151,7 +201,8 @@ def masks_to_hands(
+                 json.dump(record, f, indent=2)
+             n_written += 1
+ 
+-        print(f"  track {oid}: wrote {n_written}, skipped {n_skipped} (mask too small)")
++        print(f"  track {oid}: wrote {n_written}, skipped {n_skipped} (mask too small)"
++              + (f", {n_wilor} cropped on WiLoR hand box" if crop_source == "wilor" else ""))
+ 
+ 
+ def main() -> None:
+@@ -166,6 +217,11 @@ def main() -> None:
+                         help="Dir containing _DATA/hamer_ckpts/.")
+     parser.add_argument("--bbox_expansion", type=float, default=1.7)
+     parser.add_argument("--mask_min_pixels", type=int, default=256)
++    parser.add_argument("--crop_source", choices=("mask", "wilor"), default="mask",
++                        help="'wilor' centres the crop on the WiLoR hand box that "
++                             "best sits inside each SAM2 mask (falls back to the mask).")
++    parser.add_argument("--wilor_raw_dir", default=None,
++                        help="WiLoR per-frame detections (required for --crop_source wilor).")
+     args = parser.parse_args()
+     masks_to_hands(
+         frames_dir       = args.frames_dir,
+@@ -175,6 +231,8 @@ def main() -> None:
+         weights_dir      = args.weights_dir,
+         bbox_expansion   = args.bbox_expansion,
+         mask_min_pixels  = args.mask_min_pixels,
++        crop_source      = args.crop_source,
++        wilor_raw_dir    = args.wilor_raw_dir,
+     )
+ 
+ 

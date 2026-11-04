@@ -11,7 +11,7 @@ Per (frame, side) row:
   ca_mpjpe_<ref>     MPJPE after removing the mean translation (pose/shape error, mm)
   kp_<view>, pck10_<view>   2D error of the method's joints projected into that view vs that view's own detector
                      keypoints (score >= KP_MIN_SCORE), px of that view's published image
-  iou_a, iou_b       rendered MANO silhouette vs SAM2 hand mask in cam_a (benchmark px) / cam_b (published px),
+  iou_a, iou_b, iou_c  rendered MANO silhouette vs SAM2 hand mask in cam_a (benchmark px) / cam_b, cam_c (published px),
                      both clipped to the hand region from that view's detector keypoints (masks include the
                      forearm); iou_*_full = unclipped
   stereo_abs, stereo_signed   median |rendered depth - SGBM| / signed median over mask pixels (mm). Uses cam_b!
@@ -125,16 +125,18 @@ def evaluate_episode(tr: HandTracks, ref, mano: Mano, do_masks: bool = True, do_
                         reg = hand_region(n_ * np.diag(A.K)[:2] + A.K[:2, 2], ref.kp2d_score[i, s, v], ma.shape)
                         if reg is not None:
                             row["iou_a"] = iou(sil & reg, ma & reg)
-                mb = ref.mask("ego_cam_b", i, side)
-                if mb is not None and mb.sum() >= 400:
-                    B = cams["ego_cam_b"]
+                for tag in ("b", "c"):  # held-out cameras (published px); cam_c masks: build_masks_b --camera c
+                    mb = ref.mask(f"ego_cam_{tag}", i, side)
+                    if mb is None or mb.sum() < 400:
+                        continue
+                    B = cams[f"ego_cam_{tag}"]
                     sil = silhouette(B.project(V), faces, B.size)
-                    row["iou_b_full"] = iou(sil, mb)
+                    row[f"iou_{tag}_full"] = iou(sil, mb)
                     if ref.kp2d is not None:
-                        v = ref.kp_views.index("ego_cam_b")
+                        v = ref.kp_views.index(f"ego_cam_{tag}")
                         reg = hand_region(ref.kp2d[i, s, v], ref.kp2d_score[i, s, v], mb.shape)
                         if reg is not None:
-                            row["iou_b"] = iou(sil & reg, mb & reg)
+                            row[f"iou_{tag}"] = iou(sil & reg, mb & reg)
             if do_stereo and ref.stereo is not None:
                 got = ref.stereo.get(i, side)
                 if got is not None:

@@ -79,6 +79,9 @@ class V2DDev(Dataset):
                     return None
                 x = cv2.imread(str(mb_dir / side / f"{i:06d}.png"), cv2.IMREAD_GRAYSCALE)
                 return None if x is None else x > 0
+            if view == "ego_cam_c" and (rd / "masks_c").exists():
+                x = cv2.imread(str(rd / "masks_c" / side / f"{i:06d}.png"), cv2.IMREAD_GRAYSCALE)
+                return None if x is None else x > 0
             return None
 
         st = rd / "stereo.npz"
