@@ -13,8 +13,16 @@ Steps (benchmarked as experiment "E7tri-hawor", see handtracking/results/REPORT_
   2 RTMPose hand keypoints in cam_a and cam_c, on crops placed by the SAM2 hand masks (cam_b is not used)
   3 triangulate cam_a + cam_c keypoints; translate each hand onto them (frames with >= 4 joints), carry the shift
     across frames without joints (up to 1 s), SGBM stereo scale ($S/stereo_depth) where nothing else applies
-  4 Savitzky-Golay smoothing; short gaps (<= --max-gap frames) linearly filled and marked interpolated
-Left/right of each SAM2 hand track is decided by overlap with HaWoR's left / right hands.
+  4 per-frame HaMeR fallback (handbench.hand_fallback, benchmarked as "E8fallback-e1best-smooth"): upstream HaMeR on
+    the SAM2 hand masks (pipeline/hamer_pass.py), its depth corrected like HaWoR's (keypoint shift, else stereo scale
+    per frame; uncorrected HaMeR hands are never used). Frames where the HaWoR hand is implausible in cam_a (joints
+    outside its SAM2 mask or far from the cam_a keypoints, e.g. HaWoR on another person's hand) or missing take the
+    HaMeR hand when that one is plausible; the jump at each switch is spread over a few frames. Off with
+    --no-hamer-fallback, or automatically when no HaMeR environment is found.
+  5 Savitzky-Golay smoothing over the spliced track; short gaps (<= --max-gap frames) linearly filled and marked
+    interpolated
+Left/right of each SAM2 hand track is decided by overlap with HaWoR's left / right hands. Each written frame records
+how it was corrected ("correction": keypoints / carried / stereo / none / fallback / filled).
 
 Usage (bench venv, handtracking/.venv-bench):
   python -m handbench.pipeline.multiview_hands --video-dir VIDEO_DIR --episode EP --stereo-dir S --hand-masks E/hand_masks \
@@ -47,6 +55,8 @@ from handbench.crops import PerspectiveCrop  # noqa: E402
 from handbench.hand_correction import (HOLD_S, MIN_STEREO_FRAC, SCALE_RANGE, carry_offsets, runs_of,  # noqa: E402
                                        shift_to_keypoints)
 from handbench.fit import refit_global  # noqa: E402
+from handbench.hand_fallback import better, choose_fallback, is_plausible, plausibility, seam_offsets  # noqa: E402
+from handbench.pipeline import hamer_pass  # noqa: E402
 from handbench.mano import Mano  # noqa: E402
 from handbench.render import depth_map  # noqa: E402
 
@@ -235,6 +245,42 @@ def fill_gaps(J, V, P, B, obs, max_gap):
     return filled
 
 
+def fallback(hm, J, V, obs, T, usable, kp_a, kp_sc, side, faces, a, tracks, A, depth, fill_missing):
+    """One side. hm = HaMeR (J, V, betas, pose), not metric; J, V = the corrected HaWoR hand (before smoothing).
+    HaMeR's depth is corrected like HaWoR's: keypoint shift where >= 4 joints are triangulated, else a per-frame stereo
+    scale about the camera; frames with neither are not usable. Returns (use (n,) bool, info incl. "hands")."""
+    JH, VH, BH, PH = (x.copy() for x in hm)
+    has = np.isfinite(JH[:, 0, 0])
+    off = shift_to_keypoints(JH, T, usable, has)
+    ok_depth = np.isfinite(off[:, 0])
+    JH[ok_depth] += off[ok_depth, None]
+    VH[ok_depth] += off[ok_depth, None]
+    for i in np.nonzero(has & ~ok_depth)[0]:
+        D, M = depth(i), side_mask(a.hand_masks, tracks, side, i)
+        if D is None or M is None:
+            continue
+        k, frac = stereo_scale(VH[i], faces, A, D, M)
+        if frac >= MIN_STEREO_FRAC and np.isfinite(k) and SCALE_RANGE[0] < k < SCALE_RANGE[1]:
+            JH[i] *= k
+            VH[i] *= k
+            ok_depth[i] = True
+    has_f = has & ok_depth
+    n = len(obs)
+    hit_p, kp_p, hit_f, kp_f = (np.full(n, np.nan) for _ in range(4))
+    for i in np.nonzero(obs | has_f)[0]:
+        M = side_mask(a.hand_masks, tracks, side, i)
+        for X, hit, kpx, have in ((J, hit_p, kp_p, obs), (JH, hit_f, kp_f, has_f)):
+            if have[i]:
+                uv = X[i, :, :2] / X[i, :, 2:3] * np.diag(A.K)[:2] + A.K[:2, 2]
+                hit[i], kpx[i] = plausibility(uv, M, kp_a[i], kp_sc[i])
+    ok_p, ok_f = is_plausible(hit_p, kp_p), is_plausible(hit_f, kp_f)
+    use = choose_fallback(obs, ok_p, has_f, ok_f, better(hit_p, kp_p, hit_f, kp_f), fill_missing)
+    info = {"hamer_frames": int(has.sum()), "hamer_metric_frames": int(has_f.sum()),
+            "hawor_implausible": int((obs & ~ok_p).sum()), "fallback_replaced": int((use & obs).sum()),
+            "fallback_added": int((use & ~obs).sum()), "hands": (JH, VH, BH, PH)}
+    return use, info
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--video-dir", required=True)
@@ -247,6 +293,12 @@ def main():
     ap.add_argument("--gpu", default="0")
     ap.add_argument("--max-gap", type=int, default=15)
     ap.add_argument("--rig", default=str(HB / "refs" / "calib" / "rig.json"))
+    ap.add_argument("--no-hamer-fallback", action="store_true", help="HaWoR hands only (no per-frame HaMeR fallback)")
+    ap.add_argument("--fallback-replace-only", action="store_true",
+                    help="use HaMeR only where HaWoR's hand is implausible, not where HaWoR has no hand")
+    ap.add_argument("--hamer-python", default="", help="python of an env with video_to_data's v2d.hamer.lib "
+                                                       "(default: $HAMER_PYTHON or the first found, see hamer_pass.py)")
+    ap.add_argument("--hamer-weights", default="", help="HaMeR weights folder with _DATA/ (default: $HAMER_WEIGHTS ...)")
     a = ap.parse_args()
     t0 = time.time()
     a.work = a.work or str(Path(a.out).parent / "multiview_work")
@@ -275,6 +327,21 @@ def main():
     usable = np.isfinite(T[..., 0]) & U[..., 2]
     hold = int(round(HOLD_S * float(cv2.VideoCapture(str(raw_a)).get(cv2.CAP_PROP_FPS) or 20.0)))
     info = {"tracks": tracks}
+    hamer = None
+    if not a.no_hamer_fallback:
+        hdir = hamer_pass.run(Path(a.work), raw_a, A, tracks, n, a.hand_masks, a.gpu, a.hamer_python, a.hamer_weights)
+        if hdir is not None:
+            hamer = hamer_pass.hands(hdir, tracks, mano, A.K, n, a.hand_masks)
+    info["hamer_fallback"] = hamer is not None
+    # cam_a keypoints in the undistorted cam_a pixels the hands are projected into (for the fallback's checks)
+    kp_a = np.stack([A.undistort_px(np.nan_to_num(kp[:, s, 0]).reshape(-1, 2)).reshape(n, 21, 2) for s in range(2)], 1)
+    kp_a = kp_a * np.diag(A.K)[:2] + A.K[:2, 2]
+    stereo_cache = {}
+
+    def depth(i):
+        if i not in stereo_cache:
+            stereo_cache[i] = decode_depth(Path(a.stereo_dir) / "stereo_depth" / f"{i:06d}.png")
+        return stereo_cache[i]
     out = Path(a.out)
     for s, side, is_right in SIDES:
         J0, V0, B, P = hands[side]
@@ -290,7 +357,7 @@ def main():
         for run in runs_of(obs & ~cov):
             ss = []
             for i in run:
-                D = decode_depth(Path(a.stereo_dir) / "stereo_depth" / f"{i:06d}.png")
+                D = depth(i)
                 M = side_mask(a.hand_masks, tracks, side, i)
                 if D is None or M is None:
                     continue
@@ -301,17 +368,29 @@ def main():
                 J[run] = J0[run] * np.median(ss)
                 V[run] = V0[run] * np.median(ss)
                 step[run] = "stereo"
-        for run in runs_of(obs):
+        B, P = B.copy(), P.copy()
+        tracked, fb = obs.copy(), {}
+        if hamer is not None:
+            use, fb = fallback(hamer[side], J, V, obs, T[:, s], usable[:, s], kp_a[:, s], sc[:, s, 0], side, faces,
+                               a, tracks, A, depth, not a.fallback_replace_only)
+            JH, VH, BH, PH = fb.pop("hands")
+            J[use], V[use], B[use], P[use] = JH[use], VH[use], BH[use], PH[use]
+            step[use] = "fallback"
+            tracked = obs | use
+            d = seam_offsets(np.nan_to_num(J.mean(1)), tracked, use)
+            J += d[:, None]
+            V += d[:, None]
+        for run in runs_of(tracked):
             if len(run) >= 7:
                 J[run] = savgol_filter(J[run], 7, 2, axis=0, mode="interp")
                 V[run] = savgol_filter(V[run], 7, 2, axis=0, mode="interp")
-        filled = fill_gaps(J, V, P, B, obs, a.max_gap)
+        filled = fill_gaps(J, V, P, B, tracked, a.max_gap)
         d = out / side
         d.mkdir(parents=True, exist_ok=True)
         for f in d.glob("*.json"):
             f.unlink()
         written = 0
-        for i in np.nonzero(obs | filled)[0]:
+        for i in np.nonzero(tracked | filled)[0]:
             go, tr, sc_ = refit_global(mano, P[i], B[i], is_right, V[i])
             uv = V[i, :, :2] / V[i, :, 2:3] * np.diag(A.K)[:2] + A.K[:2, 2]
             rec = {"track_id": s, "is_right": is_right, "frame_idx": int(i), "image_size": list(A.size),
@@ -323,9 +402,10 @@ def main():
                    "source": "multiview_hands", "correction": "filled" if filled[i] else str(step[i])}
             json.dump(rec, open(d / f"{i:06d}.json", "w"))
             written += 1
-        k_ = max(int(obs.sum()), 1)
+        k_ = max(int(tracked.sum()), 1)
         info[side] = {"frames_written": written, "hawor_frames": int(obs.sum()), "filled_frames": int(filled.sum()),
-                      **{f"{st}_frac": float((step[obs] == st).sum() / k_) for st in ("keypoints", "carried", "stereo", "none")}}
+                      **{f"{st}_frac": float((step[tracked] == st).sum() / k_)
+                         for st in ("keypoints", "carried", "stereo", "none", "fallback")}, **fb}
         print(f"[multiview] {side}: {json.dumps(info[side])}", flush=True)
     info["wall_time_s"] = time.time() - t0
     json.dump(info, open(out / "multiview_hands_info.json", "w"), indent=1)
