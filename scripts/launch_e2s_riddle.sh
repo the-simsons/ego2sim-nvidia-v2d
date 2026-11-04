@@ -23,12 +23,14 @@ fr = json.load(open(sys.argv[1]))["frames"]; n = min(int(sys.argv[2]), len(fr))
 print(",".join(fr[round(i * (len(fr) - 1) / max(n - 1, 1))] for i in range(n)))
 PY
 )
-echo "capture $CAPTURE, spec $TAG, GPU $GPU, frames $FRAMES"
+# per-run brief: ego2sim/briefs/$TAG.md if present (generic brief + object notes), else the generic brief
+TEMPLATE="$PWD/AGENT_TASK_EGO2SIM.md"; [ -f "ego2sim/briefs/$TAG.md" ] && TEMPLATE="$PWD/ego2sim/briefs/$TAG.md"
+echo "capture $CAPTURE, spec $TAG, GPU $GPU, frames $FRAMES, brief $TEMPLATE"
 echo "start (UTC): $(date -u +%Y-%m-%dT%H:%M)"
 sudo env HOME="$HOME" PATH="$PATH" MAMBA_ROOT_PREFIX="$MAMBA_ROOT_PREFIX" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" \
   BLENDER="$HOME/v2d/blender/blender" SANDBOX_EGRESS_HOSTS="api.anthropic.com:443 platform.claude.com:443" \
   ${ARTSCRIPT_CLAUDE_MODEL:+ARTSCRIPT_CLAUDE_MODEL="$ARTSCRIPT_CLAUDE_MODEL"} \
   ./run.sh --capture "captures/$CAPTURE" --frames "$FRAMES" "$TAG" \
-    --task-template "$PWD/AGENT_TASK_EGO2SIM.md" --contract "ego2sim/specs/$TAG.json" \
+    --task-template "$TEMPLATE" --contract "ego2sim/specs/$TAG.json" \
     --side-by-side-max-dimension 1024 --candidate-sheet-max-dimension 1024 \
     --gpu "$GPU" --workers 4 --agent claude --timeout-hours 1.5 --detach

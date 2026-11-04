@@ -1,0 +1,10 @@
+single 3 eval/ep3_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep3.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 6 eval/ep6_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep6.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 10 eval/ep10_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep10.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 15 eval/ep15_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep15.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 19 eval/ep19_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep19.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 25 eval/ep25_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep25.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 30 eval/ep30_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep30.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 33 eval/ep33_v1_cleanedref_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep33.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 36 eval/ep36_v1_cleanedref_ray5decay - 2048 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep36.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 38 eval/ep38_v1_cleanedref_ray5decay - 2048 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/eval/overrides_ep38.txt tracking_96m_pickup_ray5decay wrench 0.001

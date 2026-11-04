@@ -5,13 +5,20 @@
 # ids free, sides are voted from WiLoR). Every stage is skipped when its output exists (delete to redo).
 # Env: SPLIT=public|evaluation (default public), MESH_SRC=scan (public scans; validation) or a dir with <obj>.glb/.obj,
 #      STOP_BEFORE_FP=1: run only the mesh-independent stages (stereo, SAM2, MoGe, VO, hands).
-# Output: ~/v2d/ego2sim/train/epEP/{processed/sequence_id=epEP/robot_name=sharpa_wave, reconstructed_stage}
+#      DEPTH=stereo (SGBM, default) | stereo_fs (FoundationStereo, computed into epEP/stereo_fs/ if missing): the depth
+#      FoundationPose tracks with (VO, hands and the bundle keep SGBM stereo/).
+#      FP_KW: extra run_video_to_poses kwargs, e.g. "n_particles=16" (NOTES Phase 7d).
+#      F0_K: static-start frame-0 smoothing over the first F0_K frames (default 5; 0 = off; NOTES Phase 8d).
+#      TAG: suffix for this variant's tracks (epEP/fp_<obj>TAG), hand gap fill (hands/objfillTAG) and output
+#      (train/epEPTAG), so variants do not overwrite each other. The shared bundles/loaded/processed/ per-object
+#      intermediates and the pinned repo's ego_recon assets (by object name) are still rewritten by each run.
+# Output: ~/v2d/ego2sim/train/epEP$TAG/{processed/sequence_id=epEP/robot_name=sharpa_wave, reconstructed_stage}
 set -euo pipefail
 EP=${1:?episode}; OBJS=${2:?objects}; GPU=${3:-0}
-SPLIT=${SPLIT:-public}; MESH_SRC=${MESH_SRC:-scan}
+SPLIT=${SPLIT:-public}; MESH_SRC=${MESH_SRC:-scan}; DEPTH=${DEPTH:-stereo}; FP_KW=${FP_KW:-}; TAG=${TAG:-}
 source ~/v2d/env.sh
 export CUDA_VISIBLE_DEVICES=$GPU
-E=~/v2d/ego2sim/ep$EP; S=$E/stereo; W=~/v2d/ego2sim; T=$W/train/ep$EP
+E=~/v2d/ego2sim/ep$EP; S=$E/stereo; W=~/v2d/ego2sim; T=$W/train/ep$EP$TAG
 DATA=~/v2d/v2d_data/track_3/$SPLIT; RECON=~/v2d/vtd_pinned/reconstruction
 HOST=~/v2d/envs/recon_host/.venv/bin/python; CV=~/v2d/envs/v2d_sam2/.venv/bin/python
 FPY=~/v2d/envs/v2d_foundation_pose/.venv/bin/python; RGPY=~/v2d/envs/rg_retarget/.venv/bin/python
@@ -56,26 +63,37 @@ for side in left right; do
 done
 lap "hands (MANO tracks)"
 [ "${STOP_BEFORE_FP:-0}" = 1 ] && { lap "stopped before FoundationPose (STOP_BEFORE_FP=1)"; exit 0; }
+if [ "$DEPTH" = stereo_fs ] && [ ! -f "$E/stereo_fs/stereo_stats.json" ]; then
+  ~/v2d/envs/foundation_stereo/.venv/bin/python ~/v2d/tools/ego_stereo_depth.py "$CALIB" ~/v2d/tests_recon/stereo/extr_ep12.json \
+    "$DATA/videos/chunk-000" "$EP" "$E/stereo_fs" --method fs 2>&1 | grep -v -i -E "warn|autocast" | tail -1
+  rm -f "$E/stereo_fs/cam_a_undist.mp4"  # identical to stereo/cam_a_undist.mp4
+  lap "FoundationStereo depth"
+fi
 for i in "${!NAMES[@]}"; do
-  n=${NAMES[$i]}; [ -d "$E/fp_$n" ] && continue
+  n=${NAMES[$i]}; [ -d "$E/fp_$n$TAG" ] && continue
   $HOST -c "
 from v2d.foundation_pose.docker.run_video_to_poses import run_video_to_poses
-run_video_to_poses('$S/cam_a_undist.mp4', '$S/stereo_depth', '$E/masks/$i', '$S/intrinsics_undist.json', '$(mesh_of "$n")',
-                   '$E/fp_$n', 'data/weights/foundation_pose', backend='nvlabs_pytorch', target_width=1014, target_height=760,
-                   mask_depth=True, reregister_iou_thresh=0.3)" > "$E/fp_$n.log" 2>&1
+run_video_to_poses('$S/cam_a_undist.mp4', '$E/$DEPTH/stereo_depth', '$E/masks/$i', '$S/intrinsics_undist.json', '$(mesh_of "$n")',
+                   '$E/fp_$n$TAG', 'data/weights/foundation_pose', backend='nvlabs_pytorch', target_width=1014, target_height=760,
+                   mask_depth=True, reregister_iou_thresh=0.3${FP_KW:+, $FP_KW})" > "$E/fp_$n$TAG.log" 2>&1
 done
-lap "FoundationPose: $(for n in "${NAMES[@]}"; do echo -n "$n $(ls $E/fp_$n | wc -l) "; done)"
+lap "FoundationPose ($DEPTH ${FP_KW:-defaults}): $(for n in "${NAMES[@]}"; do echo -n "$n $(ls $E/fp_$n$TAG/*.json | wc -l) "; done)"
+if [ "${F0_K:-5}" -gt 1 ]; then  # static-start frame 0 (the scorer aligns on frame 0; NOTES Phase 8d); F0_K=0 disables
+  $CV ~/v2d/tools/fp_static_start.py "$E/camera_vo.npz" $(for n in "${NAMES[@]}"; do echo -n "$E/fp_$n$TAG "; done) \
+    --k "${F0_K:-5}" 2>&1 | grep -v -i warn
+  lap "frame-0 static start (k ${F0_K:-5})"
+fi
 
-fps_dirs=$(for n in "${NAMES[@]}"; do echo -n "$E/fp_$n=$(mesh_of "$n"),"; done | sed 's/,$//')
+fps_dirs=$(for n in "${NAMES[@]}"; do echo -n "$E/fp_$n$TAG=$(mesh_of "$n"),"; done | sed 's/,$//')
 nfr=$(ls "$E/hands/frames" | wc -l)
 for side in left right; do  # long gaps while gripping (WiLoR loses occluded hands): carry the hand with the object
-  [ -d "$E/hands/objfill/$side" ] || ~/v2d/envs/v2d_hamer/.venv/bin/python ~/v2d/tools/fill_hand_gaps_object.py \
-    "$E/camera_vo.npz" "$E/hands/clean/$side" "$E/hands/objfill/$side" --objects "$fps_dirs" --frames "$nfr" 2>&1 \
+  [ -d "$E/hands/objfill$TAG/$side" ] || ~/v2d/envs/v2d_hamer/.venv/bin/python ~/v2d/tools/fill_hand_gaps_object.py \
+    "$E/camera_vo.npz" "$E/hands/clean/$side" "$E/hands/objfill$TAG/$side" --objects "$fps_dirs" --frames "$nfr" 2>&1 \
     | grep -v -i warn || true
 done
 lap "hands"
-objargs=(); for i in "${!NAMES[@]}"; do n=${NAMES[$i]}; objargs+=("$n=$E/fp_$n=$(mesh_of "$n")"); done
-hand_dir() { [ -n "$(ls "$E/hands/objfill/$1" 2>/dev/null)" ] && echo "$E/hands/objfill/$1" || true; }  # empty -> no hand
+objargs=(); for i in "${!NAMES[@]}"; do n=${NAMES[$i]}; objargs+=("$n=$E/fp_$n$TAG=$(mesh_of "$n")"); done
+hand_dir() { [ -n "$(ls "$E/hands/objfill$TAG/$1" 2>/dev/null)" ] && echo "$E/hands/objfill$TAG/$1" || true; }  # empty -> no hand
 LEFT_HAND=$(hand_dir left) RIGHT_HAND=$(hand_dir right) RETARGET_ARGS="--smooth_reference --adaptive_offset" \
   DEVICE=${DEVICE:-cpu} GPU=$GPU bash ~/v2d/scripts/ego2sim_episode.sh "ep$EP" "$S" "$E/camera_vo.npz" "$excl" "${objargs[@]}" \
   2>&1 | grep -E "Loaded|table top|rror" || true

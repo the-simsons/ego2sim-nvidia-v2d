@@ -1,0 +1,8 @@
+{
+ "8": "/runs/ep8_v2clean_ray5decay/p1_96M/policy_88080384.safetensors",
+ "10": "/runs/ep10_v2clean_ray5decay/p1_96M/policy_58720256.safetensors",
+ "16": "/runs/ep16_v2clean_ray5decay/p1_96M/policy_83886080.safetensors",
+ "32": "/runs/ep32_v2clean_ray5decay/p1_96M/policy_46137344.safetensors",
+ "33": "/runs/ep33_v2clean_ray5decay/p1_96M/policy_88080384.safetensors",
+ "36": "/runs/ep36_v2clean_ray5decay/p1_96M/policy_79691776.safetensors"
+}

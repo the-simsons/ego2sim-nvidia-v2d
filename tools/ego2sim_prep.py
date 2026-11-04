@@ -5,8 +5,11 @@
              + margin) or have no valid depth. Fixes AgentSTAR's wish.md item 1 (a rack/tray behind the cup was
              don't-care, so the render could spill into it for free).
   size       Metric size target for the object from stereo: per frame, back-project the eroded, unoccluded object
-             mask, drop depth outliers, and take the longest PCA extent (--trim percentile at each end); the target is the
-             median over frames (0.5% trim + median: +4.1 / -1.7 / -3.7% on the cup / dust pan / lid scans).
+             mask, drop depth outliers, and take the longest PCA extent (--trim percentile at each end); the target is
+             the p90 over the frames where no hand touches the object mask (all frames if fewer than 5). Each view only
+             sees part of the object, so the per-frame extent is a lower bound: the old median over all frames was
+             12% low on average (worst -33%, nested cup) on 10 public objects with FoundationStereo depth; erode 3 +
+             hand-free + p90 is 0.0% on average, 3.2% mean / 8.3% worst error (size_scale_check.py, NOTES Phase 7c).
              Fixes wish.md item 2 (measure_depth's box was dominated by hand/background points).
 
 Usage:
@@ -82,6 +85,7 @@ def cmd_size(a):
     K = json.load(open(Path(a.stereo_dir) / "intrinsics_undist.json"))
     stems = a.frames.split(",") if a.frames else [p.stem for p in sorted((obj / "mask_object").glob("*.png"))]
     kernel = np.ones((7, 7), np.uint8)
+    edge = np.ones((a.erode, a.erode), np.uint8) if a.erode else None
     rows = []
     for stem in stems:
         m = read_mask(obj / "mask_object" / f"{stem}.png")
@@ -89,9 +93,11 @@ def cmd_size(a):
         d = stereo_depth(a.stereo_dir, stem)
         if m is None or d is None:
             continue
-        m = cv2.erode(m.astype(np.uint8), kernel) > 0  # drop depth-edge flying pixels
-        if occ is not None:
-            m &= ~(cv2.dilate(occ.astype(np.uint8), kernel) > 0)
+        hand = cv2.dilate(occ.astype(np.uint8), kernel) > 0 if occ is not None else np.zeros_like(m)
+        handfree = bool(hand[m].mean() < 0.01) if m.any() else False
+        if edge is not None:
+            m = cv2.erode(m.astype(np.uint8), edge) > 0  # drop depth-edge flying pixels
+        m &= ~hand
         v, u = np.nonzero(m & (d > 0))
         if len(u) < 200:
             continue
@@ -106,23 +112,29 @@ def cmd_size(a):
         q = p @ vt.T
         ext = np.percentile(q, 100 - a.trim, 0) - np.percentile(q, a.trim, 0)
         area = float(np.sum((z / K["fx"]) * (z / K["fy"])))  # metric visible area (m^2)
-        rows.append({"frame": stem, "n": int(len(u)), "area_m2": area, "longest_m": float(ext.max()),
+        rows.append({"frame": stem, "n": int(len(u)), "area_m2": area, "longest_m": float(ext.max()), "handfree": handfree,
                      "extents_m": [float(x) for x in sorted(ext, reverse=True)]})
     if a.select == "full":  # frames showing (nearly) the whole object: partial views shrink the extent
         A = np.array([r["area_m2"] for r in rows])
         keep = A >= 0.85 * np.percentile(A, 90)
         rows = [r for r, k in zip(rows, keep) if k]
+    select = a.select
+    if select == "handfree":
+        free = [r for r in rows if r["handfree"]]
+        rows, select = (free, "handfree") if len(free) >= 5 else (rows, f"all ({len(free)} hand-free < 5)")
     L = np.array([r["longest_m"] for r in rows])
-    res = {"method": f"stereo PCA extent of eroded unoccluded mask, {a.trim}-{100 - a.trim} pct, per frame, frames: {a.select}",
+    target = float(np.median(L)) if a.agg == "median" else float(np.percentile(L, int(a.agg[1:])))
+    res = {"method": f"stereo PCA extent of mask eroded {a.erode} px, unoccluded, {a.trim}-{100 - a.trim} pct, per frame, "
+                     f"frames: {select}, target {a.agg}",
            "frames_used": len(rows),
            "longest_m_median": float(np.median(L)), "longest_m_p80": float(np.percentile(L, 80)),
-           "longest_m_max": float(L.max()),
-           "target_longest_m": float(np.median(L)), "tolerance": a.tolerance,
+           "longest_m_p90": float(np.percentile(L, 90)), "longest_m_max": float(L.max()),
+           "target_longest_m": target, "tolerance": a.tolerance,
            "per_frame": rows}
     json.dump(res, open(a.out_json, "w"), indent=1)
-    print(f"size: {len(rows)} frames; longest extent median {res['longest_m_median']*100:.1f} cm, "
-          f"p80 {res['longest_m_p80']*100:.1f} cm, max {res['longest_m_max']*100:.1f} cm -> target (median) "
-          f"{res['target_longest_m']*100:.1f} cm +/- {a.tolerance:.0%}  ({a.out_json})")
+    print(f"size: {len(rows)} frames ({select}); longest extent median {res['longest_m_median']*100:.1f} cm, "
+          f"p90 {res['longest_m_p90']*100:.1f} cm, max {res['longest_m_max']*100:.1f} cm -> target ({a.agg}) "
+          f"{target*100:.1f} cm +/- {a.tolerance:.0%}  ({a.out_json})")
 
 
 def cmd_stereo_depth(a):
@@ -166,8 +178,12 @@ def main():
     s.add_argument("out_json")
     s.add_argument("--frames", default="")
     s.add_argument("--tolerance", type=float, default=0.08)
-    s.add_argument("--select", choices=["all", "full"], default="all",
-                   help="full: only frames whose visible metric area >= 85%% of its p90 (drops partial / stacked views)")
+    s.add_argument("--select", choices=["handfree", "all", "full"], default="handfree",
+                   help="handfree: frames where hands cover < 1%% of the object mask (all frames if fewer than 5); "
+                        "full: only frames whose visible metric area >= 85%% of its p90 (drops partial / stacked views)")
+    s.add_argument("--agg", choices=["p90", "p80", "median"], default="p90",
+                   help="target over the selected frames (old default: median over all frames, 12%% low on average)")
+    s.add_argument("--erode", type=int, default=3, help="mask erosion in px before back-projection (old default 7)")
     s.add_argument("--trim", type=float, default=0.5, help="percentile trimmed at each end of the PCA extent (0.5 + median target: worst 4.1%% error on cup/dust pan/lid scans)")
     sd = sub.add_parser("stereo_depth")
     sd.add_argument("capture_dir")

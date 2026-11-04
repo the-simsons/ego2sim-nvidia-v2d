@@ -1,0 +1,91 @@
+# S0 observation + hand-to-object surface vectors and the active-object mask (s0/s0_multi.py).
+
+
+_target_: s0_multi.S0MultiObservationConfig
+base:
+  _target_: flash_chord.envs.observation.PolicyObservationConfig
+  sides: [right, left]
+  contact_sides: [left, right]
+  make_wrist_quat_unique: true
+  wrist_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  wrist_orientation:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  wrist_velocity:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  arm_joint_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  arm_joint_velocity:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  arm_joint_reference_delta:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  finger_joint_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  finger_joint_velocity:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  object_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  object_orientation:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  object_body_velocity:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  command_wrist:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  command_finger:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: false
+    scale: 1.0
+  command_object_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  command_object_orientation:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  raw_action:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  processed_action:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  contact_position:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+  contact_direction:
+    _target_: flash_chord.envs.observation.ObservationTermConfig
+    enabled: true
+    scale: 1.0
+extras_path: ???
+trajectory_offsets: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+ray_offsets: [0, 5, 10]
+include_shape: true
+include_image: true
+proximity_clip_m: 0.3

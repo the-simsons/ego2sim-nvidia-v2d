@@ -1,0 +1,3 @@
+single 10 eval/ep10_v2clean_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/v2clean/overrides_ep10.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 8 eval/ep8_v2clean_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/v2clean/overrides_ep8.txt tracking_96m_pickup_ray5decay wrench 0.001
+single 33 eval/ep33_v2clean_ray5decay - 1024 /usr1/e2s/v2d_challenge_data/outputs/rl_train_req/training_s0/_scratch/v2clean/overrides_ep33.txt tracking_96m_pickup_ray5decay wrench 0.001

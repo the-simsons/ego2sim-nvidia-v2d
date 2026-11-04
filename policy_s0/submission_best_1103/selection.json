@@ -1,0 +1,278 @@
+{
+ "1": {
+  "run": "ep1_v2clean2_ray5decay",
+  "phase": "p1_81M",
+  "step": 81788928,
+  "auc": 0.8877842234141791,
+  "pb": [
+   0.8764925373134328,
+   0.8990759095149254
+  ],
+  "sr": 0.96875,
+  "src": "eval_final",
+  "ref": "v2clean2",
+  "container_ckpt": "/runs/ep1_v2clean2_ray5decay/p1_81M/policy_81788928.safetensors"
+ },
+ "3": {
+  "run": "ep3_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 75497472,
+  "auc": 0.8565825928514377,
+  "pb": [
+   0.9490658696086263,
+   0.7640993160942491
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep3_v2recon_ray5decay/p1_96M/policy_75497472.safetensors"
+ },
+ "5": {
+  "run": "ep5_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 62914560,
+  "auc": 0.7492930094401042,
+  "pb": [
+   0.8247205946180556,
+   0.6738654242621528
+  ],
+  "sr": 0.984375,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep5_v2recon_ray5decay/p1_96M/policy_62914560.safetensors"
+ },
+ "6": {
+  "run": "ep6_v1_cleanedref_ray5decay",
+  "phase": "p1_96M",
+  "step": 88080384,
+  "auc": 0.8691948784722221,
+  "pb": [
+   0.8949371463477366,
+   0.8434526105967077
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v1",
+  "container_ckpt": "/runs/ep6_v1_cleanedref_ray5decay/p1_96M/policy_88080384.safetensors"
+ },
+ "8": {
+  "run": "ep8_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 88080384,
+  "auc": 0.8485882206050228,
+  "pb": [
+   0.7677431150114156,
+   0.9294333261986301
+  ],
+  "sr": 0.984375,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep8_v2clean_ray5decay/p1_96M/policy_88080384.safetensors"
+ },
+ "10": {
+  "run": "ep10_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 58720256,
+  "auc": 0.6725270526009317,
+  "pb": [
+   0.8324497767857142,
+   0.5126043284161491
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep10_v2clean_ray5decay/p1_96M/policy_58720256.safetensors"
+ },
+ "14": {
+  "run": "ep14_v2clean2_ray5decay",
+  "phase": "p1_81M",
+  "step": 79691776,
+  "auc": 0.858602403085443,
+  "pb": [
+   0.717204806170886,
+   1.0
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2clean2",
+  "container_ckpt": "/runs/ep14_v2clean2_ray5decay/p1_81M/policy_79691776.safetensors"
+ },
+ "15": {
+  "run": "ep15_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 29360128,
+  "auc": 0.8135795133659638,
+  "pb": [
+   0.9999941170933735,
+   0.6271649096385542
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep15_v2recon_ray5decay/p1_96M/policy_29360128.safetensors"
+ },
+ "16": {
+  "run": "ep16_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 83886080,
+  "auc": 0.752125293533237,
+  "pb": [
+   0.993508399566474,
+   0.5107421875
+  ],
+  "sr": 0.515625,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep16_v2clean_ray5decay/p1_96M/policy_83886080.safetensors"
+ },
+ "19": {
+  "run": "ep19_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 41943040,
+  "auc": 0.5440471243351064,
+  "pb": [
+   0.5868766622340426,
+   0.5012175864361702
+  ],
+  "sr": 0.859375,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep19_v2recon_ray5decay/p1_96M/policy_41943040.safetensors"
+ },
+ "20": {
+  "run": "ep20_v2clean2_ray5decay",
+  "phase": "p1_96M",
+  "step": 92274688,
+  "auc": 0.538351833230198,
+  "pb": [
+   0.7725141166460396,
+   0.3041895498143564
+  ],
+  "sr": 0.90625,
+  "src": "eval_final",
+  "ref": "v2clean2",
+  "container_ckpt": "/runs/ep20_v2clean2_ray5decay/p1_96M/policy_92274688.safetensors"
+ },
+ "25": {
+  "run": "ep25_v2clean2_ray5decay",
+  "phase": "p1_96M",
+  "step": 88080384,
+  "auc": 0.6175372520189607,
+  "pb": [
+   0.7471964975421348,
+   0.48787800649578655
+  ],
+  "sr": 0.9375,
+  "src": "eval_final",
+  "ref": "v2clean2",
+  "container_ckpt": "/runs/ep25_v2clean2_ray5decay/p1_96M/policy_88080384.safetensors"
+ },
+ "28": {
+  "run": "ep28_v2clean2_ray5decay",
+  "phase": "p1_96M",
+  "step": 79691776,
+  "auc": 0.8376265092329545,
+  "pb": [
+   0.9986905184659091,
+   0.6765625
+  ],
+  "sr": 0.78125,
+  "src": "eval_final",
+  "ref": "v2clean2",
+  "container_ckpt": "/runs/ep28_v2clean2_ray5decay/p1_96M/policy_79691776.safetensors"
+ },
+ "30": {
+  "run": "ep30_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 58720256,
+  "auc": 0.8448936549429658,
+  "pb": [
+   0.748588997148289,
+   0.9411983127376427
+  ],
+  "sr": 0.921875,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep30_v2recon_ray5decay/p1_96M/policy_58720256.safetensors"
+ },
+ "32": {
+  "run": "ep32_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 46137344,
+  "auc": 0.8184423262548263,
+  "pb": [
+   0.9211661438223938,
+   0.7157185086872587
+  ],
+  "sr": 0.9375,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep32_v2clean_ray5decay/p1_96M/policy_46137344.safetensors"
+ },
+ "33": {
+  "run": "ep33_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 88080384,
+  "auc": 0.6785902702945402,
+  "pb": [
+   0.932373046875,
+   0.4248074937140805
+  ],
+  "sr": 0.984375,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep33_v2clean_ray5decay/p1_96M/policy_88080384.safetensors"
+ },
+ "35": {
+  "run": "ep35_v1_cleanedref_ray5decay",
+  "phase": "p1_96M",
+  "step": 71303168,
+  "auc": 0.889462867428741,
+  "pb": [
+   0.889462867428741
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v1",
+  "container_ckpt": "/runs/ep35_v1_cleanedref_ray5decay/p1_96M/policy_71303168.safetensors"
+ },
+ "36": {
+  "run": "ep36_v2clean_ray5decay",
+  "phase": "p1_96M",
+  "step": 79691776,
+  "auc": 0.8805690456081081,
+  "pb": [
+   0.8805690456081081
+  ],
+  "sr": 0.984375,
+  "src": "eval_final",
+  "ref": "v2clean",
+  "container_ckpt": "/runs/ep36_v2clean_ray5decay/p1_96M/policy_79691776.safetensors"
+ },
+ "37": {
+  "run": "ep37_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 71303168,
+  "auc": 0.9348484064569537,
+  "pb": [
+   0.9348484064569537
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep37_v2recon_ray5decay/p1_96M/policy_71303168.safetensors"
+ },
+ "38": {
+  "run": "ep38_v2recon_ray5decay",
+  "phase": "p1_96M",
+  "step": 96468992,
+  "auc": 0.9784265090304183,
+  "pb": [
+   0.9784265090304183
+  ],
+  "sr": 1.0,
+  "src": "eval_final",
+  "ref": "v2raw",
+  "container_ckpt": "/runs/ep38_v2recon_ray5decay/p1_96M/policy_96468992.safetensors"
+ }
+}

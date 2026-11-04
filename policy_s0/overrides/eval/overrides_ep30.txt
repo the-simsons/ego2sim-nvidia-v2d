@@ -1,0 +1,1 @@
+sim.njmax=1024 sim.nconmax=512 termination.wrist_position.threshold=0.4 termination.object_position.threshold=0.25 termination.object_orientation.threshold=1.5 action=relative_hand_pose objective=tracking_s0 objective.extras_path=/feat/episode_000030.npz reset=s0_pickup reset.extras_path=/feat/episode_000030.npz training.updates_per_collection=4.0

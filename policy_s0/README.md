@@ -1,24 +1,39 @@
-# S0 per-episode policies (second Track 3 submission)
+# V2D Track 3 submission code: per-episode S0 policies, v1/v2 reconstruction mix
 
-Policy training code for our second NVIDIA V2D Track 3 submission, written by our teammate on top of
-the Ego2Sim reconstructions of the 20 evaluation episodes (object trajectories + meshes from this repo).
-Checkpoints and data are not committed.
+Code that produced the Track 3 submission: one FlashCHORD / FlashSAC policy per evaluation episode, trained on a
+reconstructed reference of that episode (no ground truth), then rolled out with the kit's official evaluator.
 
-- `rian_eval/`: cleaning of the reconstructed object trajectories before training (`clean_refs.py`,
-  `settle_spawn.py`, `*.sh`): removes false spin of the cups, fixes 180-degree flips of thin objects, and
-  settles each object's starting pose in a free-fall simulation so it no longer starts inside the table.
-- `s0/`: the S0 recipe (observation, action, reward, reset, EMA weights, VOC gate, features, train/eval scripts).
-  One policy per episode, FlashSAC in FlashCHORD for 96.8M env steps.
-  - Inputs: the future object trajectory, an object shape code, hand rays from the video, frozen image features.
-    The reconstructed hand trajectory is not followed.
-  - Rewards: object-keypoint tracking, plus a reward for both hands supporting the object.
-  - Resets: practice resets just before each pickup, plus slightly displaced object starts.
-  - Checkpoint per episode: the best by AUC over 64 parallel rollouts against the cleaned reference
-    (weights are an exponential moving average).
-- `cfg/`: Hydra configs (`observation/policy_s0.yaml`, `action/relative_hand_pose.yaml`,
-  `objective/tracking_s0.yaml`, `reset/s0_pickup.yaml`, `curriculum/tracking_96m_pickup_ray5decay.yaml`).
-- `train_logged.py`: runs FlashCHORD's `train_flash_sac.py` with W&B replaced by a local JSONL logger
-  (FlashCHORD source untouched). `monitor_training.py`: training monitor.
+Runtime: video_to_data FlashCHORD at 8c778f9 (the kit's pinned revision), Docker image
+`flashchord-cuda12-575-test:193382a1-20261018`.
 
-Rollouts were produced by the official kit evaluator (pinned `video_to_data@8c778f9`), 1 world per episode,
-and packed with the kit's `tools/pack_submission.py`.
+## Layout
+
+| Path | What |
+| --- | --- |
+| `s0/` | S0 observation, action, objective, reset, actor EMA and VOC-gate code; feature builders; train / eval / queue scripts |
+| `cfg/` | Hydra configs (`observation/policy_s0`, `action/relative_hand_pose`, `objective/tracking_s0`, `reset/s0_pickup`, `curriculum/tracking_96m_pickup_ray5decay`) |
+| `rian_eval/` | Cleaning of the v1 references (`clean_refs.py`, `settle_spawn.py`) |
+| `train_logged.py`, `monitor_training.py`, `run_in_env.sh` | Training entry point, checkpoint monitor, container runner |
+| `selection.txt` | Which reference version and checkpoint each episode uses |
+| `checkpoints_v1_container_paths.json`, `checkpoints_v2_container_paths.json` | Checkpoints passed to the official evaluator |
+
+## References
+
+- **v1:** Ego2Sim reconstruction v1 (2026-10-21), cleaned with `rian_eval/` (cup spin removed, 180° flips unwrapped,
+  spawn poses settled). Features: `s0/s0_features_eval.py`. Runs: `s0/start_eval_queue.sh`.
+- **v2:** Ego2Sim reconstruction v2 (2026-10-27), used as delivered. Features: `s0/s0_features_v2.py`. Runs:
+  `s0/start_v2_queue.sh` (ep1, ep15), `s0/start_v2_all_queue.sh` (the other 18).
+
+Both use the same recipe: 96.8M environment steps, `tracking_96m_pickup_ray5decay` curriculum, pickup and
+object-perturbed resets, actor weight EMA. Each run's checkpoint is the best by ADD-AUC over 64 parallel rollouts.
+
+## Per-episode selection
+
+For each episode, the v2 policy is used when its best-checkpoint 64-world ADD-AUC beats the v1 policy's by at least
+0.01, otherwise the v1 policy (`selection.txt`). Meshes come from the same reconstruction version as the policy.
+Both scores are measured against that version's own reference, not ground truth.
+
+## Final submission (4 Nov)
+
+Three episodes (ep8, ep19, ep36) were replaced after per-episode Kaggle tests; how, and the scripts that did it, are in
+[probe/README.md](probe/README.md). `probe/assemble_final.sh` builds the final package.
