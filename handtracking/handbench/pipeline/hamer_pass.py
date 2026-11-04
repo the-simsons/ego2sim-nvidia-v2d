@@ -7,9 +7,11 @@ environment, never edited) on the pipeline's SAM2 hand masks, and returns its ha
               masks are in) + hand_tracks.json (SAM2 track id -> left / right, from the stage's track assignment)
   HaMeR       crop on each mask (bbox x1.7), MANO per (track, frame); its camera is a virtual pinhole (focal
               5000/256 * max(W, H), principal point at the image centre)
-  output      per side and frame: joints (21,3), vertices (778,3), betas, hand pose; every point moved along its
-              pixel ray from HaMeR's virtual camera to cam_a's K (pixel and depth kept). HaMeR's depth from that
-              virtual focal is NOT metric: the caller corrects it (keypoint shift / stereo scale) before use.
+  output      per side and frame: joints (21,3), vertices (778,3), betas, hand pose in cam_a: the hand (its shape
+              unchanged) is moved so its centroid lands on the same pixel at the depth that gives it the same image
+              size under cam_a's focal (depth * f_cam / f_virtual), as upstream align_hands does before its depth
+              alignment. That depth is HaMeR's size-based guess, not metric: the caller corrects it (keypoint shift /
+              stereo scale) before use.
 
 Environment: the first existing of --hamer-python / $HAMER_PYTHON / ~/v2d/envs/v2d_hamer/.venv/bin/python /
 handtracking/egofound/methods/.venv-e0/bin/python; weights likewise (--hamer-weights / $HAMER_WEIGHTS / ...): a
@@ -81,13 +83,16 @@ def run(work: Path, raw_video: Path, A, tracks: dict, n: int, masks_dir: str, gp
     return out
 
 
-def to_camera(X: np.ndarray, f_virtual: float, size, K: np.ndarray) -> np.ndarray:
-    """Points in HaMeR's virtual pinhole (focal f_virtual, principal point at the image centre) -> cam_a (K), each
-    moved along its pixel ray (pixel and depth kept)."""
+def to_camera(X: np.ndarray, f_virtual: float, size, K: np.ndarray, centroid: np.ndarray | None = None) -> np.ndarray:
+    """A hand (points X, (n,3)) in HaMeR's virtual pinhole (focal f_virtual, principal point at the image centre) ->
+    cam_a (K): translated (shape kept) so that `centroid` (default: X's mean) keeps its pixel and its depth becomes
+    depth * f / f_virtual (same image size under cam_a's focal f)."""
     W, H = size
-    z = X[..., 2:3]
-    uv = X[..., :2] / z * f_virtual + np.array([W / 2.0, H / 2.0])
-    return np.concatenate([(uv - K[:2, 2]) / np.diag(K)[:2] * z, z], -1)
+    c = X.mean(0) if centroid is None else centroid
+    uv = c[:2] / c[2] * f_virtual + np.array([W / 2.0, H / 2.0])
+    z = c[2] * float(np.mean(np.diag(K)[:2])) / f_virtual
+    c_new = np.r_[(uv - K[:2, 2]) / np.diag(K)[:2] * z, z]
+    return X - c + c_new
 
 
 def hands(out: Path, tracks: dict, mano, K: np.ndarray, n: int, masks_dir: str) -> dict:
@@ -117,7 +122,8 @@ def hands(out: Path, tracks: dict, mano, K: np.ndarray, n: int, masks_dir: str) 
                 if not (v[0][:, 2] > 0.05).all():
                     continue
                 fv, size = float(rec["camera"]["focal_length"]), rec["image_size"]
-                J[i], V[i] = to_camera(j[0], fv, size, K), to_camera(v[0], fv, size, K)
+                c = v[0].mean(0)  # joints and vertices move together (same translation)
+                J[i], V[i] = to_camera(j[0], fv, size, K, c), to_camera(v[0], fv, size, K, c)
                 B[i], P[i], area[i] = be, hp, a
         res[side] = (J, V, B, P)
     return res

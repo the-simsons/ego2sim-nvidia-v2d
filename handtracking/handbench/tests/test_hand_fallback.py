@@ -72,14 +72,19 @@ def test_seam_offsets_spread_small_jump_and_skip_large():
     assert np.allclose(seam_offsets(C, np.ones(n, bool), use), 0)
 
 
-def test_to_camera_keeps_pixel_and_depth():
+def test_to_camera_keeps_shape_pixel_and_image_size():
     K = np.array([[1150.0, 0, 1010.0], [0, 1150.0, 765.0], [0, 0, 1.0]])
     size, fv = (2028, 1520), 5000 / 256 * 2028
-    X = np.array([[0.05, -0.02, 0.9], [-0.1, 0.03, 1.4]])
+    rng = np.random.default_rng(0)
+    X = rng.normal(0, 0.03, (50, 3)) + np.array([0.6, -0.3, 25.0])  # a hand-sized blob, far away for the huge focal
     Y = to_camera(X, fv, size, K)
-    uv_virtual = X[:, :2] / X[:, 2:] * fv + np.array([size[0] / 2, size[1] / 2])
-    uv_cam = Y[:, :2] / Y[:, 2:] * np.diag(K)[:2] + K[:2, 2]
-    assert np.allclose(uv_virtual, uv_cam) and np.allclose(X[:, 2], Y[:, 2])
+    assert np.allclose(Y - Y.mean(0), X - X.mean(0))  # shape unchanged (pure translation)
+    c, d = X.mean(0), Y.mean(0)
+    uv_virtual = c[:2] / c[2] * fv + np.array([size[0] / 2, size[1] / 2])
+    assert np.allclose(d[:2] / d[2] * np.diag(K)[:2] + K[:2, 2], uv_virtual)  # centroid on the same pixel
+    span = lambda P, f: (np.ptp(P[:, 0]) / P[:, 2].mean()) * f  # noqa: E731
+    assert abs(span(Y, 1150.0) / span(X, fv) - 1) < 0.01  # same image size under cam_a's focal
+    assert abs(d[2] - c[2] * 1150.0 / fv) < 1e-9
 
 
 if __name__ == "__main__":
