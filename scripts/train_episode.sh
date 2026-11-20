@@ -6,6 +6,7 @@
 # MOTION_SPEED (default 1.0; the recipe uses 0.5): with the parquet at 20 fps this is one evaluator step per video frame.
 # TRAIN_LOG=offline: local W&B run under OUT/wandb (no network, no uploads) for reward/termination curves
 #   (read with tools/read_wandb_offline.py); default disabled.
+# FINAL=1: a reportable result; refuses any partition whose provenance.json is not trajectory_source=video.
 # EXTRA: extra Hydra overrides (space-separated), e.g. EXTRA="sim.njmax=1024 sim.nconmax=512" for multi-object scenes.
 set -euo pipefail
 GPU=${1:?gpu}; P=$(realpath "${2:?partition dir}"); NAME=${3:?name}
@@ -13,6 +14,10 @@ WORLDS=${4:-2048}; STEPS=${5:-8388608}
 CAP=${6:-$((WORLDS * 1024))}; MINSZ=${7:-$((WORLDS * 100))}
 SAVE=${SAVE_EVERY:-$(( (STEPS / 2 / WORLDS) * WORLDS ))}  # SAVE_EVERY: checkpoint interval (multiple of WORLDS)
 source ~/v2d/env.sh
+# Provenance gate (plans/RECONSTRUCTION_PLAN.md section 8): FINAL=1 refuses mocap/mixed trajectories; the record is
+# copied into the run dir so every checkpoint says which mode it was trained in.
+E2S_REPO=${E2S_REPO:-$(cd "$(dirname "$0")/.." && pwd)}
+python3 "$E2S_REPO/tools/check_provenance.py" "$P" ${FINAL:+--final} --copy-to ~/v2d/runs/"$NAME"
 cd ~/v2d/vtd_pinned/robotic_grounding/flash_chord
 . .venv/bin/activate
 OUT=~/v2d/runs/$NAME; mkdir -p "$OUT"

@@ -119,6 +119,35 @@ Acceptance for P0: the 3 existing clips score through `bench/run.py`; the existi
 within 1 mm; a **video-only baseline** exists for those clips (camera from video, object from FoundationPose, table
 from depth) with its numbers in `bench/history.csv`. That baseline is expected to be poor. It is the number to beat.
 
+**Status (2026-11-19): P0 accepted, with the gaps below.** Code is in `bench/`, `e2s/`, `tests/`, `tools/rgbd_vo.py`.
+- P0.1: `e2s/mocap/` (Motive loader, rigid-body fits, sync, ground truth) and `e2s/mocap/assist/` (sync, camera,
+  table), configured from the manifest. Re-running them reproduces the 2026-11-08 outputs on all 3 clips at 0.000 mm
+  (camera paths, sync lags, table depth). The outline-refine step is sensitive to the library versions: it reproduces
+  in the `v2d_sam2` env (scipy 1.17, OpenCV 5.0) but differs by 30-44 mm with the system scipy 1.11 / OpenCV 4.6.
+  Run it in `v2d_sam2`.
+- P0.2: `bench/clips/*.json`. All 3 clips are `val`, because there is only one object and one session (needs P1.5).
+- P0.3: object-trajectory metrics are in place. Missing: frame-0 error (needs a second alignment source), mesh CD-O
+  in the bench, camera and hand metrics (need P1.1 markers), and timing (needs P1.2). Alignment tries the 4
+  look-alike start orientations of a cuboid. Without this, FoundationPose starting 180 deg turned scored as a
+  140 deg error for the whole clip.
+- P0.4: `python -m bench.run --pipeline video_baseline | camera=X,object=Y`. The stage spec plays the role of `--stage`.
+- P0.5: `tests/test_firewall.py`. Provenance is written by `build_ego_bundle.py` (`--trajectory-source`), copied
+  into each retargeted partition by `ego2sim_episode.sh`, and checked by `train_episode.sh` via
+  `tools/check_provenance.py` (`FINAL=1` refuses non-video). Not done: provenance in package `quality.csv`, and running
+  reconstruction in a process that cannot see the mocap files (today the separation is only by convention: the
+  manifest's `inputs` block).
+
+| pipeline (val, 3 clips, pooled) | source | pos median / p95 cm | rot median deg | ADD-S AUC |
+|---|---|---|---|---|
+| mocap_assisted (sanity) | mocap | 0.00 / 0.00 | 0.00 | 0.997 |
+| diag: FoundationPose + mocap camera | mixed | 2.33 / 7.95 | 1.46 | 0.840 |
+| **video_baseline**: rgbd_vo (MoGe depth) + FoundationPose | **video** | **11.52 / 27.36** | **5.50** | **0.382** |
+
+The diagnostic row flatters FoundationPose, because the mocap camera was itself fitted to FoundationPose poses. Even
+so, the gap between the two rows puts most of the video-only error in the camera path: the MoGe-depth odometry
+drifts 8-19 cm per clip. Rotation error is small without the camera error. That makes stereo/LiDAR depth (5.1a) and
+camera work (P4) worth more than this plan's order suggests. P3.1 (symmetry) comes next as planned.
+
 ## 5. Accuracy work, in order of expected gain
 
 Each item states what to build, how to judge it, and what would make us drop it. Do them in the order of section 9,
@@ -132,9 +161,12 @@ sensor and no sync event. Fixing capture is cheaper than compensating in softwar
 - **P1.1 Ground truth for more stages.** Rigid marker clusters on the camera and on the back of each hand or wrist.
   One-time calibration from the camera's marker cluster to its optical centre (hand-eye calibration with a
   checkerboard seen by the camera while mocap tracks the cluster). These are for scoring only (firewall applies).
-- **P1.2 Sync.** A sharp tap of the object on the table at the start and end of every take, and a bright LED visible
-  to the camera and timestamped by the mocap system if the lab has a sync box. Video-only sync must then be within
-  one video frame of it.
+- **P1.2 Sync.** The user is building a system that synchronises the mocap and video recordings in hardware
+  (2026-11-19). Once it exists, the video-to-mocap offset is a recorded value: it goes into the clip manifest
+  (`ground_truth.sync`, with `method: hardware`), and no pipeline step estimates it. Do not build more software sync.
+  Until then, `e2s/mocap/assist/sync.py` and the lag searches in `e2s/mocap/assist/camera.py` stay, only for the
+  existing unsynchronised clips. Give `camera.py` an option to keep the recorded lag fixed, and use it for
+  hardware-synced clips. Sync is a scoring/mocap-side quantity either way: reconstruction never uses it.
 - **P1.3 Camera.** Calibrate intrinsics and distortion once per camera and lens (checkerboard, fisheye model if the
   ultra-wide is kept) and undistort before anything else. Prefer a rig with real depth: a calibrated stereo pair
   like the challenge's, or the phone's LiDAR depth recorded with the video. Record at 60 fps with a short exposure:
@@ -232,6 +264,22 @@ that mesh (a mesh is only as good as the tracking it supports). Target for P2: t
   selection with a global choice over time: keep the top hypotheses per frame (including symmetric twins) and solve
   for the smoothest consistent path (Viterbi), with terms for the table plane and for hand contact. A prototype
   exists for a cuboid in `cam_from_fp.py` (`pick_flips`).
+  *Status 2026-11-19 (P3.1 + P3.4, first pass): `tools/sym_track.py`, bench stage `fp_sym`, preset `video_sym`.
+  - It runs a Viterbi over the look-alike twins of the tracker's pose in the video-camera world.
+  - Frame 0 is the robust mean of the frames before the first hand contact, taken from the object and hand masks.
+    Contact comes at frames 24/22/10, while mocap shows the box first moving at 52/72/29, so this cue is safe.
+  - World speed cannot detect stillness: MoGe-odometry drift makes a resting box move about 5 cm/s.
+  - Result on val: 11.52 -> 11.58 cm, 5.50 -> 5.51 deg (no change). FoundationPose made no twin switches on these
+    clips, and the benchmark already aligns on the still start.
+  - Still to do: top-k FoundationPose hypotheses, which need a wrapper around the pinned module and a GPU run.
+    Table and hand terms in the Viterbi.*
+  *Status 2026-11-19 (tracker failures): `tools/fp_repair.py`, stage `fp_rep`.*
+  - *It splits the object track at implausible jumps and solves a rotation offset per segment, from continuity and
+    outline fit.*
+  - *It partly fixes the one FoundationPose failure in the val clips (clip 001: lost during a turn, wrong for 40
+    frames). Rotation p95 goes from 31 to 25 deg; medians unchanged.*
+  - *A full fix needs a per-frame failure signal. Outline fit should give one once the intrinsics are calibrated
+    (P1.3). FoundationPose re-registration triggered by that signal belongs in P3.2.*
 - **P3.2 Render-and-compare refinement** after tracking: per frame, optimise the pose against depth, silhouette and
   edges (and texture when the mesh has it), with a temporal smoothness term, over a sliding window. Initialise from
   P3.1. This is where sub-centimetre accuracy has to come from.
@@ -252,6 +300,29 @@ Judge by: the object-trajectory table on `val`, then `test`. Report flips separa
 training than a centimetre of noise.
 
 ### 5.4 Camera path (P4)
+
+*Status 2026-11-19: on the 3 BlueBox clips the camera path, not the object tracker, causes most of the
+object-trajectory error.*
+- *FoundationPose in the camera frame is within about 1-2 cm and 1.5 deg of the mocap reference.*
+- *The `rgbd_vo` camera on MoGe depth drifts 4-6 deg (median) in rotation, and its scale is inconsistent from clip to
+  clip (best global scale 0.33-0.84).*
+- *`tools/camera_pose_graph.py` (stage `video_pg`) adds per-frame table planes and the resting object to the
+  odometry. It did not help: 11.85 cm against 11.52, because the planes come from the same monocular depth.*
+- *This moves 5.1a (sensor depth: LiDAR or stereo) and a SLAM camera with global bundle adjustment ahead of further
+  tracker work.*
+- *Pi3X as the camera (`tools/pi3_camera.py`, stage `video_pi3`) is the new best video-only pipeline: 8.15 cm,
+  5.29 deg, ADD-S AUC 0.549 (rgbd_vo: 11.52, 5.50, 0.382).*
+  - *Two fixes were needed. Each chunk's Sim(3) scale has to be removed from the rotations. Pi3X's metric scale is
+    1.4-2x too large, so the path is rescaled to MoGe depth.*
+  - *Chunk scale still varies 0.6-1.2 within a clip. Longer chunks (24) did not change the result.*
+  - *Feeding the uncalibrated intrinsics (f = 713) made it worse. Calibrate the camera (P1.3) before trusting
+    anything that uses f.*
+- *Joint camera + object refinement on Pi3X (`camera_pose_graph.py --no-table --scale-every 10`, stage
+  `video_pi3_joint`) adds resting-object constraints (no hand contact) and one odometry scale per 10 frames.
+  Result: 5.62 cm / 5.26 deg / ADD-S AUC 0.648, the current best video-only pipeline. End-still error drops to
+  1.4 / 4.9 / 7.7 cm per clip.*
+  - *Variants are within noise of each other. Do not tune further on these 3 clips. The next gains need more clips
+    (P1.5), calibrated intrinsics (P1.3), and a look at the FoundationPose rotation outliers (clip 001 rot p95 68 deg).*
 
 Needed to put hands and objects in one world, and it must come from video.
 

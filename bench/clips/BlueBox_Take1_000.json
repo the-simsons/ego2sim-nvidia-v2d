@@ -1,0 +1,81 @@
+{
+ "clip": "BlueBox_Take1_000",
+ "dataset": "aims",
+ "split": "val",
+ "session": "aims-2026-11-08",
+ "notes": "One object, one session: all clips are val until more objects and sessions exist (plan P0.2, P1.5).",
+ "inputs": {
+  "video": "vid/BlueBox_Take1_000.MOV",
+  "frames": "clips/BlueBox_Take1_000/frames",
+  "frame_times": "clips/BlueBox_Take1_000/frame_times.json",
+  "intrinsics": {
+   "fx": 713.0,
+   "fy": 713.0,
+   "cx": 960.0,
+   "cy": 540.0,
+   "width": 1920,
+   "height": 1080,
+   "source": "iPhone 14 Pro ultra-wide, 14 mm equivalent tag; not calibrated"
+  },
+  "depth_source": "monocular_moge",
+  "depth": "ep/BlueBox_Take1_000/moge_depth",
+  "object_masks": {
+   "BlueBox": "clips/BlueBox_Take1_000/box_masks"
+  },
+  "hand_masks": "ep/BlueBox_Take1_000/hand_masks",
+  "hand": "right",
+  "object_meshes": {
+   "BlueBox": {
+    "mesh": "BlueBox.obj",
+    "symmetry": {
+     "flips_180": [
+      "x",
+      "y",
+      "z"
+     ]
+    },
+    "note": "the bare cuboid mesh given to FoundationPose; its symmetry is what the reconstruction may assume"
+   }
+  }
+ },
+ "ground_truth": {
+  "mocap_csv": "traj/BlueBox_Take1_000.csv",
+  "format": "motive_csv",
+  "up_axis": "z",
+  "bodies": {
+   "BlueBox": {
+    "rigid_body": "BlueBox",
+    "mesh": "BlueBox.obj",
+    "box_extents": [
+     0.3048,
+     0.1524,
+     0.0762
+    ],
+    "rb_to_mesh": {
+     "translation": [
+      0.0056,
+      -0.0191,
+      -0.0357
+     ],
+     "rotation_deg_xyz": [
+      0,
+      0,
+      -5.55
+     ],
+     "fit": "marker positions + resting poses (NOTES 2026-11-08)"
+    },
+    "symmetry": {
+     "revolution_axis": null,
+     "flips_180": [],
+     "note": "textured box with markers: no visual symmetry in truth; the bare cuboid mesh has 4"
+    }
+   }
+  },
+  "sync": {
+   "video_to_mocap_lag_s": 0.864,
+   "method": "motion correlation, refined by outline fit (e2s/mocap/assist)"
+  },
+  "table_z": 0.7693
+ },
+ "outputs_dir": "ep/BlueBox_Take1_000"
+}
