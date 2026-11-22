@@ -11,7 +11,9 @@ which is wrong for upright objects such as cups -> run the loader with --no_grou
 Usage (recon_host env):
   python build_ego_bundle.py --stereo-dir S --cam-npz C --out-root OUT --clip ep12 \
       --object blue_cup=FP_DIR=MESH [--object NAME=FP_DIR=MESH ...] [--exclude-masks DIR,DIR] \
-      [--left-hand DIR] [--right-hand DIR] [--no-still-snap]
+      [--left-hand DIR] [--right-hand DIR] [--no-still-snap]       --trajectory-source video [--mocap-used-for camera_path,sync] [--depth-source stereo]
+Every bundle gets a provenance record (manifest.json "provenance" and provenance.json, e2s/provenance.py); policy
+training refuses anything but trajectory_source=video for a final result.
 Stationary stretches of each object are held at their mean pose (still_snap) unless --no-still-snap.
 """
 import argparse
@@ -26,6 +28,10 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 
 from v2d.common.result_bundle import write_result_bundle
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from e2s import provenance  # noqa: E402
 
 WORLD_KEYS = ("camera_to_world_transform", "object_to_world_transform",
               "hand_left_wrist_to_world_transform", "hand_right_wrist_to_world_transform")
@@ -141,7 +147,13 @@ def main():
     ap.add_argument("--left-hand", default=None)
     ap.add_argument("--right-hand", default=None)
     ap.add_argument("--no-still-snap", action="store_true", help="keep raw object poses through stationary stretches")
+    ap.add_argument("--trajectory-source", required=True, choices=provenance.SOURCES,
+                    help="video unless motion capture supplied any input (see --mocap-used-for)")
+    ap.add_argument("--mocap-used-for", default="", help=f"comma list from {provenance.USES}")
+    ap.add_argument("--depth-source", default="stereo")
     a = ap.parse_args()
+    prov = provenance.make(a.trajectory_source, [u for u in a.mocap_used_for.split(",") if u],
+                           depth_source=a.depth_source, builder="tools/build_ego_bundle.py", clip=a.clip)
     out_root = Path(a.out_root)
     c2w = np.load(a.cam_npz)["camera_to_world"]
     work = out_root / f"{a.clip}_inputs"
@@ -190,7 +202,9 @@ def main():
                                     "alignment_transform": A.tolist(), "table_normal_cam0": n_up.tolist(),
                                     "table_inliers": n_in}
         man["still_snap_runs"] = runs
+        man["provenance"] = prov
         json.dump(man, open(man_p, "w"), indent=2)
+        provenance.write(rdir.parent.parent, prov)
         valid = arr["object_is_valid"].mean()
         print(f"{name}: {npz_path} ({len(arr['camera_to_world_transform'])} frames, object valid {valid:.0%}, "
               f"hands valid L {arr['hand_left_is_valid'].mean():.0%} R {arr['hand_right_is_valid'].mean():.0%})")

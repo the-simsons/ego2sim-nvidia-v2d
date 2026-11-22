@@ -4,7 +4,11 @@
 # Needs ~/v2d/ego2sim/epEP/{obj_prompts.json,hand_prompts.json} (SAM2 prompts; object_id i = i-th name in OBJS; hand
 # ids free, sides are voted from WiLoR). Every stage is skipped when its output exists (delete to redo).
 # Env: SPLIT=public|evaluation (default public), MESH_SRC=scan (public scans; validation) or a dir with <obj>.glb/.obj,
-#      STOP_BEFORE_FP=1: run only the mesh-independent stages (stereo, SAM2, MoGe, VO, hands).
+#      STOP_BEFORE_FP=1: run only the mesh-independent stages (stereo, SAM2, mono depth, VO, hands).
+#      MONO_DEPTH=dp2 (Depth Pro 2, default since 2026-11-22: plans/RECONSTRUCTION_PLAN.md 5.1a) | moge (MoGe-2, the old
+#      default): the monocular depth that fills stereo holes (tools/fuse_depth.py) for the hand tracker. Depth Pro 2 gets
+#      the calibrated fx. Outputs go to mono_depth_dp2/ + fused_depth_dp2/ (moge: moge_depth/ + fused_depth/), so cached
+#      outputs of one model are never reused for the other.
 #      DEPTH=stereo (SGBM, default) | stereo_fs (FoundationStereo, computed into epEP/stereo_fs/ if missing): the depth
 #      FoundationPose tracks with (VO, hands and the bundle keep SGBM stereo/).
 #      FP_KW: extra run_video_to_poses kwargs, e.g. "n_particles=16" (NOTES Phase 7d).
@@ -45,12 +49,20 @@ from v2d.sam2.docker.run_video_to_masks import run_video_to_masks
 run_video_to_masks('$S/cam_a_undist.mp4', '$E/${k}_prompts.json', '$out', 'data/weights/sam2')" > "$E/sam2_$k.log" 2>&1
 done
 lap "SAM2 masks: objects $(ls $E/masks | tr '\n' ' '), hands $(ls $E/hand_masks | tr '\n' ' ')"
-[ -d "$E/moge_depth" ] || $HOST -c "
+MONO_DEPTH=${MONO_DEPTH:-dp2}
+if [ "$MONO_DEPTH" = moge ]; then
+  MONO=$E/moge_depth; FUSED=$E/fused_depth
+  [ -d "$MONO" ] || $HOST -c "
 from v2d.moge.docker.run_video_to_depth import run_video_to_depth
 run_video_to_depth('$S/cam_a_undist.mp4', '$E/moge_depth', '$E/moge_intr', 'data/weights/moge', batch_size=8,
                    input_intrinsics_path='$S/intrinsics_undist.json')" > "$E/moge.log" 2>&1
-[ -d "$E/fused_depth" ] || $CV ~/v2d/tools/fuse_depth.py "$S/stereo_depth" "$E/moge_depth" "$E/fused_depth"
-lap "MoGe + fused depth"
+else
+  MONO=$E/mono_depth_dp2; FUSED=$E/fused_depth_dp2
+  E2S_REPO=${E2S_REPO:-$(cd "$(dirname "$0")/.." && pwd)}
+  [ -n "$(ls "$MONO" 2>/dev/null)" ] || HF_HOME=${DP2_HF_HOME:-/usr1/e2s/rborah_v2d/hf}     ${DP2_PY:-/usr1/e2s/rborah_v2d/envs/dp2/bin/python} "$E2S_REPO/tools/dp2_depth.py" --frames "$S/cam_a_undist.mp4"     --out "$MONO" --intrinsics "$S/intrinsics_undist.json" > "$E/dp2.log" 2>&1
+fi
+[ -d "$FUSED" ] || $CV ~/v2d/tools/fuse_depth.py "$S/stereo_depth" "$MONO" "$FUSED"
+lap "mono depth ($MONO_DEPTH) + fused depth"
 excl=$(ls -d $E/masks/* $E/hand_masks/* | tr '\n' ',' | sed 's/,$//')
 [ -f "$E/camera_vo.npz" ] || $CV ~/v2d/tools/ego_vo.py "$S" "$E/camera_vo.npz" --masks "$excl" 2>&1 | tail -1
 lap "camera VO"
@@ -63,7 +75,7 @@ if [ "${HAND_TRACKER:-wilor}" = multiview ]; then  # same output layout as ego_h
     --out "$E/hands/hands_by_side" --gpu "$GPU" 2>&1 | grep -E "^\[multiview\] (left|right|mask track|done)" || true)
 else
 [ -d "$E/hands/hands_by_side" ] || $HOST ~/v2d/tools/ego_hands.py "$S" "$E/hands" --hands "$hand_ids" \
-  --hand-masks "$E/hand_masks" --object-masks "$objm" --depth-dir "$E/fused_depth" --gpu "$GPU" 2>&1 \
+  --hand-masks "$E/hand_masks" --object-masks "$objm" --depth-dir "$FUSED" --gpu "$GPU" 2>&1 \
   | grep -E "votes|WARNING|real \+|^track" || true
 fi
 for side in left right; do

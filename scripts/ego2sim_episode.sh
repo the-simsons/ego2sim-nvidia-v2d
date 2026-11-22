@@ -7,6 +7,9 @@
 #      LEFT_HAND / RIGHT_HAND (hand-track dirs; empty = placeholder zero hands), GPU (default 0),
 #      DEVICE (default cuda:0; "cpu" when the GPUs are busy training) for the loader + retarget,
 #      RETARGET_ARGS (extra ego_recon_to_sharpa.py flags, e.g. "--surface_project"),
+#      TRAJ_SOURCE (default video), MOCAP_USED_FOR (comma list), DEPTH_SOURCE (default stereo): the provenance record
+#      (e2s/provenance.py) written into each bundle and copied into each retargeted partition, where
+#      scripts/train_episode.sh reads it (FINAL=1 refuses anything but video),
 #      REF_FPS (default 20.0): written into the retargeted parquet's fps (the ego_recon registry says 30). With FlashSAC
 #      task.motion_speed=1.0 and sim fps 20 Hz this gives ONE evaluator step per video frame, which the packer needs
 #      (the evaluator numbers rows reference_frame = step + start_frame). True video rate is 20.25 fps (1.2% slower).
@@ -22,7 +25,7 @@ objargs=(); for o in "$@"; do objargs+=(--object "$o"); done
 hands=(); [ -n "${LEFT_HAND:-}" ] && hands+=(--left-hand "$LEFT_HAND"); [ -n "${RIGHT_HAND:-}" ] && hands+=(--right-hand "$RIGHT_HAND")
 echo "== bundle"
 ~/v2d/envs/recon_host/.venv/bin/python ~/v2d/tools/build_ego_bundle.py --stereo-dir "$S" --cam-npz "$CAM" \
-  --out-root "$W/bundles" --clip "$CLIP" "${objargs[@]}" --exclude-masks "$EXCL" "${hands[@]}" 2>&1 | grep -v -i warn
+  --out-root "$W/bundles" --clip "$CLIP" "${objargs[@]}" --exclude-masks "$EXCL" "${hands[@]}"   --trajectory-source "${TRAJ_SOURCE:-video}" --mocap-used-for "${MOCAP_USED_FOR:-}" --depth-source "${DEPTH_SOURCE:-stereo}" 2>&1 | grep -v -i warn
 for o in "$@"; do
   name=${o%%=*}; seq=${CLIP}_${name}
   echo "== $seq: loader"
@@ -53,6 +56,7 @@ PY
 mkdir -p "$W/reconstructed_stage"
 for o in "$@"; do
   name=${o%%=*}; seq=${CLIP}_${name}
+  for part in "$W/processed/sequence_id=$seq"/robot_name=*; do cp "$W/bundles/$seq/provenance.json" "$part/"; done
   echo "== $seq: support"
   $RGPY scripts/reconstruct_support_surfaces.py --input_dir "$W/processed" --dataset ego_recon --robot_name sharpa_wave \
     --sequence_id "$seq" --output "$W/reconstructed_stage/${seq}_sharpa_wave_support.usda" 2>&1 | grep -v -i warn | tail -4
